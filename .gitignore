@@ -1,0 +1,310 @@
+# ============================================================
+# 智慧水杯墊 Smart Water Cuppad
+# Android / Kotlin 專案 .gitignore
+# ============================================================
+
+
+# ============================================================
+# 1. Android Studio / IntelliJ IDEA
+# ============================================================
+
+.idea/
+*.iml
+
+# Android Studio 暫存
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+.idea/deploymentTargetDropDown.xml
+
+# 不忽略 codeStyles（團隊可以共用格式設定）
+# .idea/codeStyles/
+
+
+# ============================================================
+# 2. Gradle
+# ============================================================
+
+.gradle/
+build/
+**/build/
+
+# Gradle 本機設定
+local.properties
+
+# Gradle cache
+.gradle-cache/
+
+
+# ============================================================
+# 3. Android 編譯產生檔
+# ============================================================
+
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Android native build
+.externalNativeBuild/
+.cxx/
+
+# Captures
+captures/
+
+
+# ============================================================
+# 4. Kotlin
+# ============================================================
+
+.kotlin/
+
+# Kotlin incremental compilation
+**/.kotlin/
+
+
+# ============================================================
+# 5. Java
+# ============================================================
+
+*.class
+
+
+# ============================================================
+# 6. 作業系統產生的垃圾檔
+# ============================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+
+# ============================================================
+# 7. Log / Debug
+# ============================================================
+
+*.log
+logs/
+debug/
+*.trace
+
+
+# ============================================================
+# 8. 暫存檔
+# ============================================================
+
+*.tmp
+*.temp
+*.swp
+*.swo
+*.bak
+*.backup
+
+tmp/
+temp/
+
+
+# ============================================================
+# 9. API Key / Secret / Password
+# ★ 智慧水杯墊專案特別重要
+# ============================================================
+
+.env
+.env.*
+!.env.example
+
+secrets.properties
+secret.properties
+credentials.json
+
+*.key
+*.pem
+*.p12
+*.jks
+*.keystore
+
+
+# ============================================================
+# 10. Firebase
+# ============================================================
+
+# 如果 Firebase google-services.json
+# 含有不希望公開的專案資訊，可忽略
+google-services.json
+
+# Firebase service account
+*firebase-adminsdk*.json
+serviceAccountKey.json
+
+
+# ============================================================
+# 11. MQTT / Wi-Fi 機密設定
+# ============================================================
+
+mqtt_config.properties
+wifi_config.properties
+broker_config.properties
+
+mqtt_secrets.*
+wifi_secrets.*
+broker_secrets.*
+
+
+# ============================================================
+# 12. Raspberry Pi / Python
+# 如果同一個 Repository 也放 Pi 5 MQTT Monitor
+# ============================================================
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+venv/
+.venv/
+env/
+ENV/
+
+pip-log.txt
+pip-delete-this-directory.txt
+
+.pytest_cache/
+.mypy_cache/
+
+
+# ============================================================
+# 13. Django
+# 如果 Repository 包含智慧水杯墊 Dashboard
+# ============================================================
+
+# Django Secret
+.env
+
+# SQLite 本機資料庫
+*.sqlite3
+db.sqlite3
+
+# Django static / media
+staticfiles/
+
+# 如果 media 是使用者上傳資料，不要上 Git
+media/
+
+
+# ============================================================
+# 14. VS Code
+# ============================================================
+
+.vscode/
+
+# 如果團隊要共用 VS Code 設定，
+# 可以把上面的 .vscode/ 改成個別忽略
+
+
+# ============================================================
+# 15. Node / Web Dashboard
+# 如果之後加入 Web 前端
+# ============================================================
+
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+dist/
+.cache/
+
+
+# ============================================================
+# 16. 測試輸出
+# ============================================================
+
+test-results/
+coverage/
+reports/
+
+
+# ============================================================
+# 17. ESP32 / Arduino
+# ============================================================
+
+# Arduino build cache
+*.elf
+*.hex
+*.bin
+*.map
+
+# Arduino IDE 暫存
+build/
+build-*/
+
+# ESP32 PlatformIO（未來如果改用 PlatformIO）
+.pio/
+.pioenvs/
+.piolibdeps/
+
+
+# ============================================================
+# 18. ESP32 Wi-Fi / MQTT 私密資料
+#
+# 建議：
+# secrets.h          -> 不上 Git
+# secrets.example.h  -> 可以上 Git
+# ============================================================
+
+secrets.h
+wifi_secrets.h
+mqtt_secrets.h
+config_private.h
+
+
+# ============================================================
+# 19. 專題測試資料
+# ============================================================
+
+# 大量測試輸出
+test_data/
+raw_data/
+
+# MQTT dump
+mqtt_dump/
+*.mqttlog
+
+
+# ============================================================
+# 20. 壓縮檔 / 備份檔
+# ============================================================
+
+*.zip
+*.rar
+*.7z
+*.tar
+*.tar.gz
+
+backup/
+backups/
+
+
+# ============================================================
+# 21. 不要忽略這些重要檔案
+# ============================================================
+
+!README.md
+!.gitignore
+!.env.example
+!secrets.example.h
