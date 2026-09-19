@@ -19,6 +19,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,6 +52,7 @@ fun Page2(
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // ... (省略中間不變的代碼)
         // 1. 步驟進度卡片
         Card(
             shape = RoundedCornerShape(16.dp),
@@ -148,7 +152,7 @@ fun Page2(
                     Text(
                         text = when {
                             isRead -> "手動模式已啟動 (manualdrink)"
-                            !isStable -> "可直接讀取目前重量（START 不會 Tare）"
+                            !isStable -> "可直接讀取目前重量"
                             else -> "請點擊按鈕獲取重量"
                         },
                         fontSize = 11.sp,
@@ -178,7 +182,7 @@ fun Page2(
                 ) {
                     Text(
                         text = if (isRead) "已讀取" else "我要開始了 ",
-                        fontSize = 10.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -224,7 +228,8 @@ fun Page2(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 InteractiveCupIllustration(
-                    modifier = Modifier.size(220.dp)
+                    modifier = Modifier.size(220.dp),
+                    isRead = isRead
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -323,8 +328,34 @@ fun StepLabel(number: String, title: String, isActive: Boolean) {
 
 
 @Composable
-fun InteractiveCupIllustration(modifier: Modifier = Modifier) {
+fun InteractiveCupIllustration(
+    modifier: Modifier = Modifier,
+    isRead: Boolean = false
+) {
     val primaryColor = MaterialTheme.colorScheme.primary
+
+    // 拿起動畫控制 (0 -> 1 代表從底座拿起)
+    val liftProgress = remember { Animatable(0f) }
+
+    LaunchedEffect(isRead) {
+        if (isRead) {
+            // 點擊「我要開始了」後，執行拿起動畫
+            liftProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 1200, easing = FastOutSlowInEasing)
+            )
+        } else {
+            // 未點擊前，保持在底座上
+            liftProgress.snapTo(0f)
+        }
+    }
+
+    val progress = liftProgress.value
+
+    // 拿起狀態：向上移動並稍微傾斜 (Y:-90, X:60, Rot:45)
+    val translateY = progress * -90f
+    val translateX = progress * 60f
+    val rotation = progress * 45f
 
     Canvas(modifier = modifier) {
         val width = size.width
@@ -336,18 +367,6 @@ fun InteractiveCupIllustration(modifier: Modifier = Modifier) {
             color = Color(0xFFEBF2FE),
             radius = width * 0.45f,
             center = Offset(centerX, centerY)
-        )
-
-        val dropletY = centerY - 65f
-        drawCircle(
-            color = primaryColor.copy(alpha = 0.8f),
-            radius = 6f,
-            center = Offset(centerX - 16f, dropletY)
-        )
-        drawCircle(
-            color = primaryColor.copy(alpha = 0.5f),
-            radius = 4f,
-            center = Offset(centerX + 16f, dropletY - 4f)
         )
 
         val coasterY = centerY + 42f
@@ -366,37 +385,42 @@ fun InteractiveCupIllustration(modifier: Modifier = Modifier) {
             center = Offset(centerX, coasterY + coasterHeight / 2f)
         )
 
-        val cupWidth = 80f
-        val cupHeight = 105f
-        val cupX = centerX - cupWidth / 2f
-        val cupY = coasterY - cupHeight + 6f
+        withTransform({
+            translate(left = translateX, top = translateY)
+            rotate(degrees = rotation, pivot = Offset(centerX, coasterY))
+        }) {
+            val cupWidth = 80f
+            val cupHeight = 105f
+            val cupX = centerX - cupWidth / 2f
+            val cupY = coasterY - cupHeight + 6f
 
-        drawRoundRect(
-            color = Color(0xFFD3E4FE).copy(alpha = 0.75f),
-            topLeft = Offset(cupX, cupY),
-            size = Size(cupWidth, cupHeight),
-            cornerRadius = CornerRadius(12f, 12f)
-        )
-
-        val waterHeight = 55f
-        val waterY = cupY + (cupHeight - waterHeight)
-        drawRoundRect(
-            color = primaryColor,
-            topLeft = Offset(cupX + 3f, waterY - 3f),
-            size = Size(cupWidth - 6f, waterHeight),
-            cornerRadius = CornerRadius(0f, 0f)
-        )
-
-        val waveYCenter = waterY + waterHeight / 2f - 6f
-        for (i in -1..1) {
-            val lineY = waveYCenter + (i * 6f)
-            drawLine(
-                color = Color.White.copy(alpha = 0.95f),
-                start = Offset(centerX - 14f, lineY),
-                end = Offset(centerX + 14f, lineY),
-                strokeWidth = 3.5f,
-                cap = StrokeCap.Round
+            drawRoundRect(
+                color = Color(0xFFD3E4FE).copy(alpha = 0.75f),
+                topLeft = Offset(cupX, cupY),
+                size = Size(cupWidth, cupHeight),
+                cornerRadius = CornerRadius(12f, 12f)
             )
+
+            val waterHeight = 55f
+            val waterY = cupY + (cupHeight - waterHeight)
+            drawRoundRect(
+                color = primaryColor,
+                topLeft = Offset(cupX + 3f, waterY - 3f),
+                size = Size(cupWidth - 6f, waterHeight),
+                cornerRadius = CornerRadius(0f, 0f)
+            )
+
+            val waveYCenter = waterY + waterHeight / 2f - 6f
+            for (i in -1..1) {
+                val lineY = waveYCenter + (i * 6f)
+                drawLine(
+                    color = Color.White.copy(alpha = 0.95f),
+                    start = Offset(centerX - 14f, lineY),
+                    end = Offset(centerX + 14f, lineY),
+                    strokeWidth = 3.5f,
+                    cap = StrokeCap.Round
+                )
+            }
         }
     }
 }

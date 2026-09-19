@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -66,7 +67,13 @@ fun DrinkingWaterScreen(
         label = "intakeTextAnimation"
     )
 
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = 80.dp) // 為 TabBar 留出空間
+    ) {
         Box(Modifier.fillMaxWidth().height(390.dp).padding(horizontal = 20.dp)) {
             Column(Modifier.align(Alignment.TopCenter).padding(top = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("HYDRATION STATUS", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, letterSpacing = 1.5.sp)
