@@ -14,7 +14,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -45,14 +44,32 @@ fun Page4(
     onBackClick: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
-    val scope = rememberCoroutineScope()
+    
+    // 控制按鈕何時顯示的狀態
+    var animationFinished by remember { mutableStateOf(false) }
+
+    // 當 isRead 重設時（例如重新開始流程），也要重設動畫狀態
+    LaunchedEffect(isRead) {
+        if (!isRead) animationFinished = false
+    }
+
+    // 當動畫完成後，自動向下捲動顯示結果
+    LaunchedEffect(animationFinished) {
+        if (animationFinished) {
+            delay(300) // 增加延遲，確保 AnimatedVisibility 完全展開且佈署計算完成
+            scrollState.animateScrollTo(
+                value = scrollState.maxValue,
+                animationSpec = tween(durationMillis = 800)
+            )
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         // 1. 步驟進度卡片 (Step 2 of 3)
         Card(
@@ -99,9 +116,9 @@ fun Page4(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    StepLabel(number = "1", title = "享用飲水", isActive = false, isDone = true)
-                    StepLabel(number = "2", title = "放回結算", isActive = true, isDone = false)
-                    StepLabel(number = "3", title = "紀錄完成", isActive = false, isDone = false)
+                    Step2StepLabel(number = "1", title = "享用飲水", isActive = false, isDone = true)
+                    Step2StepLabel(number = "2", title = "放回結算", isActive = true, isDone = false)
+                    Step2StepLabel(number = "3", title = "紀錄完成", isActive = false, isDone = false)
                 }
             }
         }
@@ -143,9 +160,6 @@ fun Page4(
                     Button(
                         onClick = {
                             onReadWeight()
-                            scope.launch {
-                                scrollState.animateScrollTo(scrollState.maxValue)
-                            }
                         },
 
                         shape = RoundedCornerShape(16.dp),
@@ -178,7 +192,8 @@ fun Page4(
                     ) {
                         ReturningCupIllustration(
                             modifier = Modifier.size(220.dp),
-                            isRead = isRead
+                            isRead = isRead,
+                            onAnimationFinished = { animationFinished = true }
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Row(verticalAlignment = Alignment.Bottom) {
@@ -255,26 +270,32 @@ fun Page4(
                 }
 
                 val diff = kotlin.math.abs(startWeight - endWeight)
-                Surface(
-                    onClick = onNavigateToPage7,
-                    enabled = isRead,
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.fillMaxWidth()
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = animationFinished,
+                    enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
                 ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Surface(
+                        onClick = onNavigateToPage7,
+                        enabled = isRead,
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Box(modifier = Modifier.size(42.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) { Text("💧", fontSize = 22.sp) }
-                            Column {
-                                Text("淨補充水分 (NET HYDRATION)", fontSize = 10.sp, color = Color.White.copy(alpha = 0.8f), fontWeight = FontWeight.Bold)
-                                Text("+${String.format("%.0f", diff)} ml", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Row(
+                            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Box(modifier = Modifier.size(42.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) { Text("💧", fontSize = 22.sp) }
+                                Column {
+                                    Text("淨補充水分 (NET HYDRATION)", fontSize = 10.sp, color = Color.White.copy(alpha = 0.8f), fontWeight = FontWeight.Bold)
+                                    Text("+${String.format("%.0f", diff)} ml", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
                             }
+                            if(isRead) Icon(Icons.Default.CheckCircle, null, tint = Color.White)
                         }
-                        if(isRead) Icon(Icons.Default.CheckCircle, null, tint = Color.White)
                     }
                 }
             }
@@ -295,11 +316,14 @@ fun Page4(
 ////                Text("重新偵測放回重量", color = MaterialTheme.colorScheme.onSurfaceVariant)
 ////            }
 //        }
+        
+        // 額外留白確保底部不會被遮擋
+        Spacer(modifier = Modifier.height(20.dp))
     }
 }
 
 @Composable
-fun StepLabel(number: String, title: String, isActive: Boolean, isDone: Boolean) {
+fun Step2StepLabel(number: String, title: String, isActive: Boolean, isDone: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Box(
             modifier = Modifier.size(8.dp).clip(CircleShape)
@@ -314,133 +338,6 @@ fun StepLabel(number: String, title: String, isActive: Boolean, isDone: Boolean)
     }
 }
 
-
-@Composable
-fun ReturningCupIllustration(
-    modifier: Modifier = Modifier,
-    isRead: Boolean = false
-) {
-    val primaryColor = MaterialTheme.colorScheme.primary
-    
-    // 歸位動畫控制 (1 -> 0 代表從喝水狀態回到初始位置)
-    val returnProgress = remember { Animatable(1f) }
-    
-    LaunchedEffect(isRead) {
-        if (isRead) {
-            // 點擊「已放回」後，執行歸位動畫
-            returnProgress.animateTo(
-                targetValue = 0f,
-                animationSpec = tween(durationMillis = 1200, easing = FastOutSlowInEasing)
-            )
-        } else {
-            // 未點擊前，保持在右上方拿起狀態
-            returnProgress.snapTo(1f)
-        }
-    }
-    
-    val progress = returnProgress.value
-    
-    // 與 Page2 對應的位移參數 (拿起狀態：Y:-90, X:60, Rot:45)
-    val translateY = progress * -90f
-    val translateX = progress * 60f
-    val rotation = progress * 45f
-
-    // 呼吸動畫 (歸位後的提示)
-    val infiniteTransition = rememberInfiniteTransition(label = "cupIdleAnimation")
-    val idleTranslateY by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = -8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "idleTranslateY"
-    )
-    
-    // 水波律動
-    val waveOffset by infiniteTransition.animateFloat(
-        initialValue = -6f,
-        targetValue = 6f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "waveOffset"
-    )
-
-    Canvas(modifier = modifier) {
-        val width = size.width
-        val height = size.height
-        val centerX = width / 2f
-        val centerY = height / 2f
-
-        // 1. 底層背景圓圈
-        drawCircle(
-            color = Color(0xFFEBF2FE),
-            radius = width * 0.45f,
-            center = Offset(centerX, centerY)
-        )
-
-        // 2. 杯墊 (固定不動)
-        val coasterY = centerY + 42f
-        val coasterWidth = 140f
-        val coasterHeight = 22f
-
-        drawRoundRect(
-            color = Color(0xFFC9DBF6),
-            topLeft = Offset(centerX - coasterWidth / 2f, coasterY),
-            size = Size(coasterWidth, coasterHeight),
-            cornerRadius = CornerRadius(11f, 11f)
-        )
-        drawCircle(
-            color = primaryColor,
-            radius = 5f,
-            center = Offset(centerX, coasterY + coasterHeight / 2f)
-        )
-
-        // 3. 水杯與水 (執行歸位動畫)
-        withTransform({
-            translate(left = translateX, top = translateY + (if (progress < 0.01f) idleTranslateY else 0f))
-            rotate(degrees = rotation, pivot = Offset(centerX, coasterY))
-        }) {
-            val cupWidth = 80f
-            val cupHeight = 105f
-            val cupX = centerX - cupWidth / 2f
-            val cupY = coasterY - cupHeight + 6f
-
-            // 畫杯身
-            drawRoundRect(
-                color = Color(0xFFD3E4FE).copy(alpha = 0.85f),
-                topLeft = Offset(cupX, cupY),
-                size = Size(cupWidth, cupHeight),
-                cornerRadius = CornerRadius(12f, 12f)
-            )
-
-            // 畫杯中的水
-            val waterHeight = 55f
-            val waterY = cupY + (cupHeight - waterHeight)
-            drawRoundRect(
-                color = primaryColor,
-                topLeft = Offset(cupX + 3f, waterY - 3f),
-                size = Size(cupWidth - 6f, waterHeight),
-                cornerRadius = CornerRadius(0f, 0f)
-            )
-
-            // 畫水面波紋
-            val waveYCenter = waterY + waterHeight / 2f - 6f
-            for (i in -1..1) {
-                val lineY = waveYCenter + (i * 6f)
-                drawLine(
-                    color = Color.White.copy(alpha = 0.95f),
-                    start = Offset(centerX - 14f + waveOffset, lineY),
-                    end = Offset(centerX + 14f + waveOffset, lineY),
-                    strokeWidth = 3.5f,
-                    cap = StrokeCap.Round
-                )
-            }
-        }
-    }
-}
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable

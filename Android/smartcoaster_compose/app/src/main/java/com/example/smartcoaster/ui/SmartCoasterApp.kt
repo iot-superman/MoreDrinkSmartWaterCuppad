@@ -161,6 +161,9 @@ fun SmartCoasterApp() {
                                 // 進入流程時，同步舊數值
                                 coasterState.previousTotalIntake = coasterState.totalIntake
                                 currentSubPage = "Page2"
+                            },
+                            onTareClick = {
+                                mqttManager.publish("tare")
                             }
                         )
                         "Page2" -> Page2(

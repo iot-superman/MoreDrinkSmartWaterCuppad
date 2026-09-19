@@ -263,23 +263,11 @@ fun Page7(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("💧", fontSize = 18.sp)
-                    Text("完成並返回 (legacyauto)", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("完成並返回", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
-            Button(
-                onClick = onNavigateToHistory,
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD8E2FF)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("📊", fontSize = 16.sp)
-                    Text("查看今日歷史分析", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF001A41))
-                }
-            }
+
         }
     }
 }

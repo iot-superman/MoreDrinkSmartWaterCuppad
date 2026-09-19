@@ -38,7 +38,8 @@ fun DrinkingWaterScreen(
     totalIntake: Float = 0f,
     previousIntake: Float = totalIntake, // 預設值為當前值
     realTimeWeight: Float = 0f,
-    onNavigateToPage2: () -> Unit = {}
+    onNavigateToPage2: () -> Unit = {},
+    onTareClick: () -> Unit = {}
 ) {
     // 內部狀態用來觸發動畫
     var targetIntake by remember { mutableFloatStateOf(previousIntake) }
@@ -98,8 +99,30 @@ fun DrinkingWaterScreen(
             shadowElevation = 4.dp
         ) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Scale, null, tint = Color.White) }
+                Surface(
+                    onClick = onTareClick,
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        // 底層秤重圖示
+                        Icon(
+                            imageVector = Icons.Default.Scale,
+                            contentDescription = "歸零校準",
+                            tint = Color.White
+                        )
+                        // 中間疊加一個小型的回轉箭頭，代表 Tare / 重設
+                        Icon(
+                            imageVector = Icons.Default.Autorenew,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(16.dp)
+                                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                .padding(1.dp)
+                        )
+                    }
                 }
                 Column(Modifier.padding(start = 16.dp).weight(1f)) {
                     Text("智慧杯墊即時數據", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)

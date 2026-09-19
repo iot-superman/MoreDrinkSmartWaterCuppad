@@ -357,6 +357,18 @@ fun InteractiveCupIllustration(
     val translateX = progress * 60f
     val rotation = progress * 45f
 
+    // 水波律動
+    val infiniteTransition = rememberInfiniteTransition(label = "waveAnimation")
+    val waveOffset by infiniteTransition.animateFloat(
+        initialValue = -6f,
+        targetValue = 6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "waveOffset"
+    )
+
     Canvas(modifier = modifier) {
         val width = size.width
         val height = size.height
@@ -415,8 +427,8 @@ fun InteractiveCupIllustration(
                 val lineY = waveYCenter + (i * 6f)
                 drawLine(
                     color = Color.White.copy(alpha = 0.95f),
-                    start = Offset(centerX - 14f, lineY),
-                    end = Offset(centerX + 14f, lineY),
+                    start = Offset(centerX - 14f + (if (isRead) waveOffset else 0f), lineY),
+                    end = Offset(centerX + 14f + (if (isRead) waveOffset else 0f), lineY),
                     strokeWidth = 3.5f,
                     cap = StrokeCap.Round
                 )
