@@ -39,6 +39,11 @@ fun SmartCoasterApp() {
     var currentSubPage by remember { mutableStateOf("Main") }
     var mqttStatus by remember { mutableStateOf("Initializing...") }
     var lastLog by remember { mutableStateOf("Ready") }
+
+    // Tare Popup 狀態：只有收到 ESP32 的 Tare 開始訊息才顯示。
+    // 收到 TARE_DONE 後先顯示 100% 約 0.5 秒，再自動消失。
+    var showTareDialog by remember { mutableStateOf(false) }
+    var tareDone by remember { mutableStateOf(false) }
     
     val coasterState = remember { CoasterState() }
 
@@ -50,7 +55,17 @@ fun SmartCoasterApp() {
             onStatusChanged = { status -> mqttStatus = status },
             onLogReceived = { log -> lastLog = log },
             onModeConfirmed = { mode -> coasterState.deviceMode = mode },
-            onStabilityChanged = { stable -> coasterState.isStable = stable }
+            onStabilityChanged = { stable -> coasterState.isStable = stable },
+            onTareStateChanged = { isTaring ->
+                if (isTaring) {
+                    tareDone = false
+                    showTareDialog = true
+                } else if (showTareDialog) {
+                    // TARE_DONE / TARE_ERROR 到達。正常 TARE_DONE 會讓動畫到 100%。
+                    // 現有韌體正常流程使用 TARE_DONE；Popup 隨後自動關閉。
+                    tareDone = true
+                }
+            }
         )
     }
 
@@ -137,12 +152,10 @@ fun SmartCoasterApp() {
                             previousIntake = coasterState.previousTotalIntake,
                             realTimeWeight = coasterState.realTimeWeight,
                             onNavigateToPage2 = {
-                                scope.launch {
-                                    coasterState.isStable = false // 剛進來時先設為不穩定，等待硬體 Tare 完成
-                                    mqttManager.publish("manualdrink")
-                                    kotlinx.coroutines.delay(1000) // 增加延遲確保模式切換完成
-                                    mqttManager.publish("tare")
-                                }
+                                // 進入手動飲水模式只切換模式，不再自動 Tare。
+                                // START 必須保留杯子目前的真實重量；若在這裡 Tare，
+                                // 會把杯重歸近 0，造成「不穩定中」以及 Start = 0 / -0.x 的錯誤。
+                                mqttManager.publish("manualdrink")
                                 coasterState.isStartRead = false
                                 coasterState.isEndRead = false
                                 // 進入流程時，同步舊數值
@@ -156,7 +169,9 @@ fun SmartCoasterApp() {
                             startWeight = coasterState.startWeight,
                             isRead = coasterState.isStartRead,
                             onReadWeight = {
-                                mqttManager.publish("getweight")
+                                // START：直接記住畫面目前正在收到的即時重量。
+                                // 不送 tare、不送 getweight、不等待硬體重新量測，
+                                // 因此不會因重新 Tare 進入「不穩定中」，也不會有 MQTT 回覆競速問題。
                                 coasterState.startWeight = coasterState.realTimeWeight
                                 coasterState.isStartRead = true
                             },
@@ -173,12 +188,12 @@ fun SmartCoasterApp() {
                             endWeight = coasterState.endWeight,
                             isRead = coasterState.isEndRead,
                             onReadWeight = {
-                                mqttManager.publish("getweight")
+                                // END：同樣直接記住目前即時重量，不 Tare、不重新量測。
                                 coasterState.endWeight = coasterState.realTimeWeight
                                 coasterState.isEndRead = true
                             },
                             onNavigateToPage7 = {
-                                coasterState.intakeAmount = (kotlin.math.abs(coasterState.startWeight) - kotlin.math.abs(coasterState.endWeight)).coerceAtLeast(0f)
+                                coasterState.intakeAmount = kotlin.math.abs(coasterState.startWeight - coasterState.endWeight)
                                 coasterState.totalIntake += coasterState.intakeAmount
                                 currentSubPage = "Page7"
                             },
@@ -202,6 +217,17 @@ fun SmartCoasterApp() {
                 1 -> PlaceholderScreen(Icons.Default.History, "歷史記錄", "紀錄內容...")
                 else -> PlaceholderScreen(Icons.Default.Settings, "設定", "設定內容...")
             }
+
+            // 全 App 共用的 Tare 校準 Popup。
+            // 不論目前在哪個頁面，只要 MQTT 偵測到 ESP32 正在 Tare 就覆蓋顯示。
+            TareCalibrationDialog(
+                visible = showTareDialog,
+                tareDone = tareDone,
+                onFinished = {
+                    showTareDialog = false
+                    tareDone = false
+                }
+            )
         }
     }
 }

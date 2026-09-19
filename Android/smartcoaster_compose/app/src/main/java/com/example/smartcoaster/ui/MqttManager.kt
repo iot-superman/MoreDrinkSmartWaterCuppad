@@ -9,9 +9,12 @@ class MqttManager(
     private val onStatusChanged: (String) -> Unit,
     private val onLogReceived: (String) -> Unit,
     private val onModeConfirmed: (String) -> Unit,
-    private val onStabilityChanged: (Boolean) -> Unit = {}
+    private val onStabilityChanged: (Boolean) -> Unit = {},
+    // Tare 狀態直接由 ESP32 MQTT 訊息驅動 UI Popup。true=開始，false=完成/結束。
+    private val onTareStateChanged: (Boolean) -> Unit = {}
 ) {
     private var client: MqttClient? = null
+
     private val serverUri = "tcp://mqttgo.io:1883"
     private val clientId = "SmartCoaster_App_${System.currentTimeMillis()}"
 
@@ -50,7 +53,20 @@ class MqttManager(
                         onModeConfirmed(mode)
                     }
 
-                    // 2. 穩定性偵測 (根據 log，出現 TARE_DONE 或是防線布署完成等字眼代表去皮成功且回穩)
+                    // 2. Tare 校準狀態偵測。
+                    // ESP32 executeTare() 開始會送「執行去皮歸零 (Tare)...」，
+                    // 完成會送固定格式「TARE_DONE:<重量>」。
+                    // UI 不用猜時間：開始訊息出現 Popup，TARE_DONE 才真正完成。
+                    if (payload.contains("執行去皮歸零") ||
+                        payload.contains("正在進行開機精準去皮歸零") ||
+                        payload.contains("深度去皮歸零")) {
+                        onTareStateChanged(true)
+                    }
+                    if (payload.contains("TARE_DONE") || payload.contains("TARE_ERROR")) {
+                        onTareStateChanged(false)
+                    }
+
+                    // 3. 穩定性偵測 (根據 log，出現 TARE_DONE 或是防線布署完成等字眼代表去皮成功且回穩)
                     if (payload.contains("TARE_DONE") || payload.contains("防線布署完成") || payload.contains("EMPTY_IDLE")) {
                         onStabilityChanged(true)
                     } else if (payload.contains("執行去皮歸零") || payload.contains("深度去皮歸零") || payload.contains("硬體錯誤")) {
@@ -58,7 +74,7 @@ class MqttManager(
                         onStabilityChanged(false)
                     }
                     
-                    // 3. 重量讀取
+                    // 4. 重量讀取
                     if (payload.contains("WEIGHT_ONCE:")) {
                         val weight = payload.substringAfter("WEIGHT_ONCE:").trim()
                             .takeWhile { (it.isDigit() || it == '.' || it == '-') }

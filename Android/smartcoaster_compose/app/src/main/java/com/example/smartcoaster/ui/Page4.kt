@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartcoaster.ui.theme.SmartCoasterTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun Page4(
@@ -39,10 +40,13 @@ fun Page4(
     onNavigateToPage7: () -> Unit = {},
     onBackClick: () -> Unit = {}
 ) {
+    val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -133,8 +137,13 @@ fun Page4(
                     }
 
                     Button(
-                        onClick = onReadWeight,
-                        enabled = isStable || isRead,
+                        onClick = {
+                            onReadWeight()
+                            scope.launch {
+                                scrollState.animateScrollTo(scrollState.maxValue)
+                            }
+                        },
+
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (isRead) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
@@ -142,10 +151,11 @@ fun Page4(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                         modifier = Modifier
                             .height(32.dp)
-                            .alpha(if (isStable || isRead) 1f else 0.1f)
+
                     ) {
                         Text(
-                            text = if (isRead) "已放回" else "放好了",
+                            // Page 4：依需求固定顯示「已放回」，不再依 isRead / isStable 切換文字。
+                            text = "我放回水杯了",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -166,7 +176,9 @@ fun Page4(
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(verticalAlignment = Alignment.Bottom) {
                             Text(
-                                text = if (isRead) String.format("%.1f", endWeight) else "--.-",
+                                // Page 4：主重量區永遠顯示 MQTT 最新的即時重量。
+                                // 不再等待按下「已放回」才顯示，也不使用 --.- placeholder。
+                                text = String.format("%.1f", realTimeWeight),
                                 fontSize = 42.sp,
                                 fontWeight = FontWeight.Light,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -235,7 +247,7 @@ fun Page4(
                     }
                 }
 
-                val diff = (kotlin.math.abs(startWeight) - kotlin.math.abs(endWeight)).coerceAtLeast(0f)
+                val diff = kotlin.math.abs(startWeight - endWeight)
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = MaterialTheme.colorScheme.primary,
@@ -261,7 +273,7 @@ fun Page4(
 
         // 4. 按鈕區
         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            val diff = (kotlin.math.abs(startWeight) - kotlin.math.abs(endWeight)).coerceAtLeast(0f)
+            val diff = kotlin.math.abs(startWeight - endWeight)
             Button(
                 onClick = onNavigateToPage7,
                 enabled = isRead,
@@ -270,9 +282,9 @@ fun Page4(
             ) {
                 Text("確認存入飲水量 (+${String.format("%.0f", diff)}ml)", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
-            TextButton(onClick = onBackClick, modifier = Modifier.fillMaxWidth()) {
-                Text("重新偵測放回重量", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+//            TextButton(onClick = onBackClick, modifier = Modifier.fillMaxWidth()) {
+//                Text("重新偵測放回重量", color = MaterialTheme.colorScheme.onSurfaceVariant)
+//            }
         }
     }
 }

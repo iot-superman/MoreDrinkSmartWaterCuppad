@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartcoaster.ui.theme.SmartCoasterTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun Page2(
@@ -38,10 +39,13 @@ fun Page2(
     onNavigateToPage4: () -> Unit = {},
     onBackClick: () -> Unit = {}
 ) {
+    val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -144,7 +148,7 @@ fun Page2(
                     Text(
                         text = when {
                             isRead -> "手動模式已啟動 (manualdrink)"
-                            !isStable -> "正在偵測穩定度..."
+                            !isStable -> "可直接讀取目前重量（START 不會 Tare）"
                             else -> "請點擊按鈕獲取重量"
                         },
                         fontSize = 11.sp,
@@ -156,8 +160,13 @@ fun Page2(
                 }
 
                 Button(
-                    onClick = onReadWeight,
-                    enabled = isStable || isRead,
+                    onClick = {
+                        onReadWeight()
+                        scope.launch {
+                            scrollState.animateScrollTo(scrollState.maxValue)
+                        }
+                    },
+                    enabled = true, // START 是當前重量快照，不需要等待 Tare / isStable
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isRead) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
@@ -165,10 +174,10 @@ fun Page2(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                     modifier = Modifier
                         .height(32.dp)
-                        .alpha(if (isStable || isRead) 1f else 0.1f)
+                        .alpha(1f)
                 ) {
                     Text(
-                        text = if (isRead) "已讀取" else "讀取 START",
+                        text = if (isRead) "已讀取" else "我要開始了 ",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -186,7 +195,7 @@ fun Page2(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
+                    .padding(10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Surface(

@@ -30,10 +30,17 @@ fun Page7(
     onNavigateToHistory: () -> Unit = {},
     onBackClick: () -> Unit = {}
 ) {
+    val scrollState = rememberScrollState()
+
+    LaunchedEffect(Unit) {
+        // 直接平滑捲動到最底部
+        scrollState.animateScrollTo(scrollState.maxValue)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -198,34 +205,34 @@ fun Page7(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFD8E2FF)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("🔄", fontSize = 20.sp)
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        PulsingDot()
-                        Text("即將切回智慧背景監測", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "點擊按鈕後裝置將自動切回 legacyauto 節能常態監聽。水杯放置桌面上將持續偵測下一回飲水。",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 16.sp
-                    )
-                }
-            }
+//            Row(
+//                modifier = Modifier.padding(16.dp),
+//                verticalAlignment = Alignment.Top,
+//                horizontalArrangement = Arrangement.spacedBy(12.dp)
+//            ) {
+//                Box(
+//                    modifier = Modifier
+//                        .size(40.dp)
+//                        .clip(CircleShape)
+//                        .background(Color(0xFFD8E2FF)),
+//                    contentAlignment = Alignment.Center
+//                ) {
+//                    Text("🔄", fontSize = 20.sp)
+//                }
+//                Column(modifier = Modifier.weight(1f)) {
+//                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+//                        PulsingDot()
+//                        Text("即將切回智慧背景監測", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+//                    }
+//                    Spacer(modifier = Modifier.height(4.dp))
+//                    Text(
+//                        "點擊按鈕後裝置將自動切回 legacyauto 節能常態監聽。水杯放置桌面上將持續偵測下一回飲水。",
+//                        fontSize = 12.sp,
+//                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+//                        lineHeight = 16.sp
+//                    )
+//                }
+//            }
         }
 
         Surface(
@@ -333,7 +340,7 @@ fun CelebrationBadge(modifier: Modifier = Modifier) {
     }
 }
 
-@Preview(showBackground = true, showSystemUi = true)
+@Preview(showBackground = true, showSystemUi = true, name = "Page7 Initial")
 @Composable
 fun Page7Preview() {
     SmartCoasterTheme {
