@@ -7,6 +7,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,6 +40,11 @@ fun SmartCoasterApp() {
     var currentSubPage by remember { mutableStateOf("Main") }
     var mqttStatus by remember { mutableStateOf("Initializing...") }
     var lastLog by remember { mutableStateOf("Ready") }
+
+    // 每次 App 建立的新工作階段，只讓「找水喝」第一次進入時強制重新定位與搜尋。
+    // 使用 rememberSaveable 可避免畫面旋轉等 Activity 重建時重複定位；
+    // 使用者完整關閉並重新開啟 App 後，新的工作階段會重新設為 true。
+    var forceFreshMapSearch by rememberSaveable { mutableStateOf(true) }
 
     // Tare Popup 狀態：只有收到 ESP32 的 Tare 開始訊息才顯示。
     // 收到 TARE_DONE 後先顯示 100% 約 0.5 秒，再自動消失。
@@ -79,53 +85,57 @@ fun SmartCoasterApp() {
 
     Scaffold(
         topBar = {
-            Column {
-                Surface(
-                    color = when(mqttStatus) {
-                        "Connected" -> Color(0xFF4CAF50)
-                        "Error" -> Color(0xFFF44336)
-                        else -> Color(0xFFFF9800)
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = "Status: $mqttStatus | $lastLog",
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                        maxLines = 1
-                    )
-                }
-
-                Surface(shadowElevation = 2.dp) {
-                    Row(
-                        Modifier.fillMaxWidth().statusBarsPadding().height(64.dp).padding(horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+            // 「找水喝」使用滿版 WebView，因此第 2 個 Tab 不顯示 App 標題列與 MQTT 狀態列。
+            // 其他頁面維持原本的頂部介面，不影響既有飲水流程。
+            if (selectedTab != 1) {
+                Column {
+                    Surface(
+                        color = when(mqttStatus) {
+                            "Connected" -> Color(0xFF4CAF50)
+                            "Error" -> Color(0xFFF44336)
+                            else -> Color(0xFFFF9800)
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        if (showBackButton) {
-                            IconButton(onClick = {
-                                currentSubPage = when (currentSubPage) {
-                                    "Page2" -> "Main"
-                                    "Page4" -> "Page2"
-                                    "Page7" -> "Page4"
-                                    else -> "Main"
+                        Text(
+                            text = "Status: $mqttStatus | $lastLog",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                            maxLines = 1
+                        )
+                    }
+
+                    Surface(shadowElevation = 2.dp) {
+                        Row(
+                            Modifier.fillMaxWidth().statusBarsPadding().height(64.dp).padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (showBackButton) {
+                                IconButton(onClick = {
+                                    currentSubPage = when (currentSubPage) {
+                                        "Page2" -> "Main"
+                                        "Page4" -> "Page2"
+                                        "Page7" -> "Page4"
+                                        else -> "Main"
+                                    }
+                                }) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                                 }
-                            }) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                            } else {
+                                Spacer(modifier = Modifier.width(12.dp))
                             }
-                        } else {
-                            Spacer(modifier = Modifier.width(12.dp))
-                        }
 
-                        val title = when (selectedTab) {
-                            0 -> if (currentSubPage == "Main") "Drinking Water" else "Manual Intake"
-                            1 -> "History"
-                            else -> "Settings"
-                        }
-                        Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            val title = when (selectedTab) {
+                                0 -> if (currentSubPage == "Main") "Drinking Water" else "Manual Intake"
+                                2 -> "History"
+                                else -> "Settings"
+                            }
+                            Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
 
-                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 12.dp).size(32.dp)) {
-                            Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(18.dp)) }
+                            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 12.dp).size(32.dp)) {
+                                Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(18.dp)) }
+                            }
                         }
                     }
                 }
@@ -138,8 +148,10 @@ fun SmartCoasterApp() {
                     if (currentSubPage != "Main") mqttManager.publish("legacyauto")
                     currentSubPage = "Main"
                 }
-                NavItem(Icons.Default.History, "歷史記錄", 1, selectedTab) { selectedTab = 1 }
-                NavItem(Icons.Default.Settings, "設定", 2, selectedTab) { selectedTab = 2 }
+                // 新增第 2 個 Tab：以原生 WebView 顯示附近飲水機地圖。
+                NavItem(Icons.Default.PinDrop, "找水喝", 1, selectedTab) { selectedTab = 1 }
+                NavItem(Icons.Default.History, "歷史記錄", 2, selectedTab) { selectedTab = 2 }
+                NavItem(Icons.Default.Settings, "設定", 3, selectedTab) { selectedTab = 3 }
             }
         }
     ) { padding ->
@@ -212,12 +224,20 @@ fun SmartCoasterApp() {
                                 mqttManager.publish("legacyauto")
                                 currentSubPage = "Main"
                             },
-                            onNavigateToHistory = { selectedTab = 1 },
+                            // 「找水喝」插入第 2 個 Tab 後，歷史記錄索引改為 2。
+                            onNavigateToHistory = { selectedTab = 2 },
                             onBackClick = { currentSubPage = "Page4" }
                         )
                     }
                 }
-                1 -> PlaceholderScreen(Icons.Default.History, "歷史記錄", "紀錄內容...")
+                1 -> WaterMapScreen(
+                    forceFreshSearch = forceFreshMapSearch,
+                    onForceFreshSearchConsumed = {
+                        // 同一次 App 開啟期間切換 Tab 時，不再重複強制定位與搜尋。
+                        forceFreshMapSearch = false
+                    }
+                )
+                2 -> PlaceholderScreen(Icons.Default.History, "歷史記錄", "紀錄內容...")
                 else -> PlaceholderScreen(Icons.Default.Settings, "設定", "設定內容...")
             }
 
