@@ -2,17 +2,19 @@ package com.example.smartcoaster.ui
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
-import android.provider.Settings as AndroidSettings
+import android.provider.Settings
 import android.webkit.GeolocationPermissions
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -44,6 +46,70 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+
+/**
+ * 判斷 WebView 正在開啟的網址是否屬於 Google Maps／地圖導航。
+ *
+ * 網頁目前產生的格式是：
+ * https://www.google.com/maps/dir/?api=1&destination=緯度,經度&travelmode=walking
+ * 同時支援 Android 常見的 geo: 與 google.navigation: URI，方便未來網頁改版。
+ */
+private fun isExternalMapNavigationUri(uri: Uri): Boolean {
+    val scheme = uri.scheme?.lowercase() ?: return false
+
+    if (scheme == "geo" || scheme == "google.navigation") {
+        return true
+    }
+
+    if (scheme != "http" && scheme != "https") {
+        return false
+    }
+
+    val host = uri.host?.lowercase() ?: return false
+    val isGoogleHost = host == "google.com" || host.endsWith(".google.com")
+    val isMapsPath = uri.path.orEmpty().startsWith("/maps")
+
+    return isGoogleHost && isMapsPath
+}
+
+/**
+ * 優先以 Google Maps App 開啟導航；若手機未安裝 Google Maps，則交給系統選擇
+ * 其他地圖 App 或外部瀏覽器。無論成功與否都由 Android 消化這次點擊，避免導航
+ * 網址覆蓋原本 WebView，造成返回 App 時只剩「飲水機地圖載入失敗」。
+ */
+private fun openExternalMapNavigation(context: Context, uri: Uri): Boolean {
+    val googleMapsIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+        setPackage("com.google.android.apps.maps")
+        addCategory(Intent.CATEGORY_BROWSABLE)
+    }
+
+    val openedByGoogleMaps = runCatching {
+        context.startActivity(googleMapsIntent)
+    }.isSuccess
+
+    if (openedByGoogleMaps) {
+        return true
+    }
+
+    val fallbackIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+        addCategory(Intent.CATEGORY_BROWSABLE)
+    }
+
+    val openedByFallback = runCatching {
+        context.startActivity(fallbackIntent)
+    }.isSuccess
+
+    if (!openedByFallback) {
+        Toast.makeText(
+            context,
+            "找不到可開啟導航的地圖 App 或瀏覽器",
+            Toast.LENGTH_LONG
+        ).show()
+    }
+
+    // 即使沒有可處理的 App，也不要讓 Google Maps 網址取代飲水機 WebView。
+    return true
+}
 
 /**
  * 第 2 個 Tab「找水喝」。
@@ -383,6 +449,11 @@ fun WaterMapScreen(
                         builtInZoomControls = false
                         displayZoomControls = false
 
+                        // 導航連結雖使用 target="_blank"，仍交由目前 WebViewClient 攔截，
+                        // 再外拉 Google Maps；不在 WebView 內建立無法管理的新視窗。
+                        setSupportMultipleWindows(false)
+                        javaScriptCanOpenWindowsAutomatically = false
+
                         // 地圖只需網路內容，關閉本機檔案存取以縮小攻擊面。
                         allowFileAccess = false
                         allowContentAccess = false
@@ -445,6 +516,12 @@ fun WaterMapScreen(
                             request: WebResourceRequest?
                         ): Boolean {
                             val targetUri = request?.url ?: return false
+
+                            // Google Maps 導航必須離開 WebView，由原生 Android Intent 開啟。
+                            // 回到 App 時，原本的 Leaflet 飲水機地圖仍保持在原畫面。
+                            if (isExternalMapNavigationUri(targetUri)) {
+                                return openExternalMapNavigation(context, targetUri)
+                            }
 
                             // HTTP(S) 頁面留在 WebView；電話、地圖導航等特殊協定交由手機 App。
                             if (targetUri.scheme == "http" || targetUri.scheme == "https") {
@@ -529,7 +606,7 @@ fun WaterMapScreen(
                     onClick = {
                         context.startActivity(
                             Intent(
-                                AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                                 Uri.parse("package:${context.packageName}")
                             )
                         )

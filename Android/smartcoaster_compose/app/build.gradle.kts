@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -21,7 +23,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
+}
+
+// Kotlin 2.2 使用 compilerOptions 取代已淘汰的 kotlinOptions DSL。
+// Java 與 Kotlin 統一輸出 JVM 17 bytecode，避免 target 不一致警告。
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
 }
 
 dependencies {
