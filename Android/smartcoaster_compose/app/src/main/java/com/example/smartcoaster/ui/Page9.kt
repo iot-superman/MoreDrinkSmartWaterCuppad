@@ -19,153 +19,97 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartcoaster.ui.theme.SmartCoasterTheme
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Page9(
-    onNavigateToHome: () -> Unit = {},
-    onNavigateToHistory: () -> Unit = {},
-    onNavigateToDeviceSettings: () -> Unit = {}, // 跳轉至 Page8
-    onNavigateToDeviceConnection: () -> Unit = {}, // 跳轉至 Page3 (設備連線與綁定)
+fun Setting(
+    onNavigateToDeviceSettings: () -> Unit = {}, // 跳轉至 Page8 (進階硬體設定)
+    onNavigateToDeviceConnection: () -> Unit = {}, // 跳轉至 FindDevice (設備連線與綁定)
     onBackClick: () -> Unit = {}
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "設定",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Text("←", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                    }
-                },
-                actions = {
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 16.dp)
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("👤", fontSize = 16.sp)
-                    }
-                }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        // 預留 88.dp 避開 SmartCoasterApp 全域 TopAppBar 遮擋
+        Spacer(modifier = Modifier.height(88.dp))
+
+        // 1. 設備管理
+        SettingSection(title = "設備管理") {
+            SettingRowItem(
+                iconEmoji = "⚡",
+                title = "設備連線與綁定",
+                onClick = onNavigateToDeviceConnection
             )
-        },
-        bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp
-            ) {
-                NavigationBarItem(
-                    selected = false,
-                    onClick = onNavigateToHome,
-                    icon = { Text("☕", fontSize = 20.sp) },
-                    label = { Text("喝水", fontSize = 11.sp) }
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = onNavigateToHistory,
-                    icon = { Text("📜", fontSize = 20.sp) },
-                    label = { Text("歷史記錄", fontSize = 11.sp) }
-                )
-                NavigationBarItem(
-                    selected = true, // 高亮顯示設定
-                    onClick = { },
-                    icon = { Text("⚙️", fontSize = 20.sp) },
-                    label = { Text("設定", fontSize = 11.sp) }
-                )
-            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            SettingRowItem(
+                iconEmoji = "🛠️",
+                title = "進階硬體設定",
+                onClick = onNavigateToDeviceSettings
+            )
         }
-    ) { innerPadding ->
-        Column(
+
+        // 2. 個人目標
+        SettingSection(title = "個人目標") {
+            SettingRowItem(
+                iconEmoji = "💧",
+                title = "每日飲水目標",
+                onClick = { }
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            SettingRowItem(
+                iconEmoji = "⚖️",
+                title = "個人身體資料",
+                onClick = { }
+            )
+        }
+
+        // 3. 提醒與通知
+        SettingSection(title = "提醒與通知") {
+            SettingRowItem(
+                iconEmoji = "🔔",
+                title = "智慧補水提醒",
+                onClick = { }
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            SettingRowItem(
+                iconEmoji = "🌙",
+                title = "勿擾模式",
+                onClick = { }
+            )
+        }
+
+        // 4. 關於與支援
+        SettingSection(title = "關於與支援") {
+            SettingRowItem(
+                iconEmoji = "❓",
+                title = "幫助與反饋",
+                onClick = { }
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            SettingRowItem(
+                iconEmoji = "ℹ️",
+                title = "版本資訊",
+                onClick = { }
+            )
+        }
+
+        // 頁尾宣告
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+                .fillMaxWidth()
+                .padding(vertical = 16.dp),
+            contentAlignment = Alignment.Center
         ) {
-            // 1. 設備管理
-            SettingSection(title = "設備管理") {
-                SettingRowItem(
-                    iconEmoji = "⚡",
-                    title = "設備連線與綁定",
-                    onClick = onNavigateToDeviceConnection // 點擊連至 Page3
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                SettingRowItem(
-                    iconEmoji = "🛠️",
-                    title = "進階硬體設定",
-                    onClick = onNavigateToDeviceSettings // 導向 Page8 (Device Settings)
-                )
-            }
-
-            // 2. 個人目標
-            SettingSection(title = "個人目標") {
-                SettingRowItem(
-                    iconEmoji = "💧",
-                    title = "每日飲水目標",
-                    onClick = { }
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                SettingRowItem(
-                    iconEmoji = "⚖️",
-                    title = "個人身體資料",
-                    onClick = { }
-                )
-            }
-
-            // 3. 提醒與通知
-            SettingSection(title = "提醒與通知") {
-                SettingRowItem(
-                    iconEmoji = "🔔",
-                    title = "智慧補水提醒",
-                    onClick = { }
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                SettingRowItem(
-                    iconEmoji = "🌙",
-                    title = "勿擾模式",
-                    onClick = { }
-                )
-            }
-
-            // 4. 關於與支援
-            SettingSection(title = "關於與支援") {
-                SettingRowItem(
-                    iconEmoji = "❓",
-                    title = "幫助與反饋",
-                    onClick = { }
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                SettingRowItem(
-                    iconEmoji = "ℹ️",
-                    title = "版本資訊",
-                    onClick = { }
-                )
-            }
-
-            // 頁尾宣告
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Precision Wellness Inc.",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                )
-            }
+            Text(
+                text = "Precision Wellness Inc.",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            )
         }
+
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
@@ -248,8 +192,8 @@ fun SettingRowItem(
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
-fun Page9Preview() {
+fun SettingPreview() {
     SmartCoasterTheme {
-        Page9()
+        Setting()
     }
 }

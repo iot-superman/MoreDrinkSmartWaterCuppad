@@ -24,7 +24,6 @@ enum class DeviceMode {
     AUTO, CUP, PILLBOX
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Page8(
     onNavigateToHome: () -> Unit = {},
@@ -35,222 +34,167 @@ fun Page8(
     var selectedMode by remember { mutableStateOf(DeviceMode.AUTO) }
     var isSaving by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Device Settings",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Text("←", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    }
-                },
-                actions = {
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 16.dp)
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("👤", fontSize = 16.sp)
-                    }
-                }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        // 預留 88.dp 避開 SmartCoasterApp 全域 TopAppBar 遮擋
+        Spacer(modifier = Modifier.height(88.dp))
+
+        // 1. 設備操作區塊 (Tare and Clear Actions)
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = "設備操作",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
-        },
-        bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                NavigationBarItem(
-                    selected = false,
-                    onClick = onNavigateToHome,
-                    icon = { Text("💧", fontSize = 20.sp) },
-                    label = { Text("喝水", fontSize = 11.sp) }
+                // 去皮歸零卡片
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { /* 去皮動作 */ }
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFD8E2FF)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("⚖️", fontSize = 18.sp)
+                        }
+                        Text(
+                            text = "去皮歸零",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "重置當前重量為零",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // 紀錄清零卡片
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { /* 清零動作 */ }
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.errorContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🗑️", fontSize = 18.sp)
+                        }
+                        Text(
+                            text = "紀錄清零",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "清除今日所有數據",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
+        // 2. 識別模式選擇區塊 (Mode Selection)
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = "識別模式",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // 智慧自動
+                ModeOptionCard(
+                    title = "智慧自動",
+                    description = "自動偵測水杯或藥盒，提供最佳體驗。",
+                    iconEmoji = "✨",
+                    isSelected = selectedMode == DeviceMode.AUTO,
+                    onClick = { selectedMode = DeviceMode.AUTO }
                 )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = onNavigateToHistory,
-                    icon = { Text("📜", fontSize = 20.sp) },
-                    label = { Text("歷史記錄", fontSize = 11.sp) }
+
+                // 強制水杯
+                ModeOptionCard(
+                    title = "強制水杯",
+                    description = "固定為水杯模式，停用自動識別功能。",
+                    iconEmoji = "🥤",
+                    isSelected = selectedMode == DeviceMode.CUP,
+                    onClick = { selectedMode = DeviceMode.CUP }
                 )
-                NavigationBarItem(
-                    selected = true, // 高亮顯示設定
-                    onClick = { },
-                    icon = { Text("⚙️", fontSize = 20.sp) },
-                    label = { Text("設定", fontSize = 11.sp) }
+
+                // 強制藥盒
+                ModeOptionCard(
+                    title = "強制藥盒",
+                    description = "固定為藥盒模式，停用自動識別功能。",
+                    iconEmoji = "💊",
+                    isSelected = selectedMode == DeviceMode.PILLBOX,
+                    onClick = { selectedMode = DeviceMode.PILLBOX }
                 )
             }
         }
-    ) { innerPadding ->
-        Column(
+
+        // 3. 儲存設定按鈕
+        Button(
+            onClick = { isSaving = true },
+            shape = RoundedCornerShape(28.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .fillMaxWidth()
+                .height(52.dp)
         ) {
-            // 1. 設備操作區塊 (Tare and Clear Actions)
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = "設備操作",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // 去皮歸零卡片
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        ),
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { /* 去皮動作 */ }
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFFD8E2FF)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("⚖️", fontSize = 18.sp)
-                            }
-                            Text(
-                                text = "去皮歸零",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "重置當前重量為零",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    // 紀錄清零卡片
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        ),
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { /* 清零動作 */ }
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.errorContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("🗑️", fontSize = 18.sp)
-                            }
-                            Text(
-                                text = "紀錄清零",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "清除今日所有數據",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-
-            // 2. 識別模式選擇區塊 (Mode Selection)
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = "識別模式",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // 智慧自動
-                    ModeOptionCard(
-                        title = "智慧自動",
-                        description = "自動偵測水杯或藥盒，提供最佳體驗。",
-                        iconEmoji = "✨",
-                        isSelected = selectedMode == DeviceMode.AUTO,
-                        onClick = { selectedMode = DeviceMode.AUTO }
-                    )
-
-                    // 強制水杯
-                    ModeOptionCard(
-                        title = "強制水杯",
-                        description = "固定為水杯模式，停用自動識別功能。",
-                        iconEmoji = "🥤",
-                        isSelected = selectedMode == DeviceMode.CUP,
-                        onClick = { selectedMode = DeviceMode.CUP }
-                    )
-
-                    // 強制藥盒
-                    ModeOptionCard(
-                        title = "強制藥盒",
-                        description = "固定為藥盒模式，停用自動識別功能。",
-                        iconEmoji = "💊",
-                        isSelected = selectedMode == DeviceMode.PILLBOX,
-                        onClick = { selectedMode = DeviceMode.PILLBOX }
-                    )
-                }
-            }
-
-            // 3. 儲存設定按鈕
-            Button(
-                onClick = { isSaving = true },
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text("💾", fontSize = 18.sp)
-                    Text(
-                        text = if (isSaving) "儲存中..." else "儲存設定",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                Text("💾", fontSize = 18.sp)
+                Text(
+                    text = if (isSaving) "儲存中..." else "儲存設定",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
+
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 

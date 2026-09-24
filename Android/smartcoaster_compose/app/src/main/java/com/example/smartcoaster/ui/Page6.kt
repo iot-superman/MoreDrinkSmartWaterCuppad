@@ -27,9 +27,8 @@ import androidx.compose.ui.unit.sp
 import com.example.smartcoaster.ui.theme.SmartCoasterTheme
 import kotlinx.coroutines.delay
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Page6(
+fun ConnectSuccess(
     onBackClick: () -> Unit = {}
 ) {
     // 漸進式動畫進場狀態
@@ -43,46 +42,22 @@ fun Page6(
         isCardVisible = true
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Device Connection",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Text("←", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                    }
-                },
-                actions = {
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 16.dp)
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("👤", fontSize = 16.sp)
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center // 關鍵：讓所有內容在螢幕垂直置中
         ) {
-            // 1. 連線成功標頭與動畫圖示
+            // 預留些許空間避免緊貼 TopAppBar
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // 1. 連線成功標頭與動畫圖示 (螢幕核心置中焦點)
             AnimatedVisibility(
                 visible = isHeaderVisible,
                 enter = slideInVertically(initialOffsetY = { 40 }) + fadeIn()
@@ -92,14 +67,14 @@ fun Page6(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     SuccessCheckAnimation(
-                        modifier = Modifier.size(96.dp)
+                        modifier = Modifier.size(108.dp) // 稍微加大打勾圖示，提升視覺震撼力
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     Text(
                         text = "連線成功",
-                        fontSize = 24.sp,
+                        fontSize = 26.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -116,7 +91,7 @@ fun Page6(
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(36.dp))
 
             // 2. 設備資訊卡片
             AnimatedVisibility(
@@ -130,8 +105,8 @@ fun Page6(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Text(
                             text = "設備資訊",
@@ -141,7 +116,7 @@ fun Page6(
                             letterSpacing = 0.5.sp
                         )
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
 
                         // Row 1: 設備名稱
                         InfoRow(
@@ -187,7 +162,7 @@ fun Page6(
                         // Row 3: MQTT 狀態
                         Row(
                             modifier = Modifier
-                                .padding(vertical = 6.dp)
+                                .padding(vertical = 4.dp)
                                 .fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
@@ -224,6 +199,8 @@ fun Page6(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(40.dp))
         }
     }
 }
@@ -311,7 +288,7 @@ fun SuccessCheckAnimation(modifier: Modifier = Modifier) {
             Box(contentAlignment = Alignment.Center) {
                 Text(
                     text = "✓",
-                    fontSize = 44.sp,
+                    fontSize = 48.sp,
                     color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
@@ -322,8 +299,8 @@ fun SuccessCheckAnimation(modifier: Modifier = Modifier) {
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
-fun Page6Preview() {
+fun ConnectSuccessPreview() {
     SmartCoasterTheme {
-        Page6()
+        ConnectSuccess()
     }
 }

@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartcoaster.ui.theme.SmartCoasterTheme
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Page5(
     onNavigateToDrink: () -> Unit = {},
@@ -33,282 +32,232 @@ fun Page5(
     var selectedRange by remember { mutableStateOf("本週") }
     var isDropdownExpanded by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "History",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                },
-                actions = {
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 16.dp)
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("👤", fontSize = 18.sp)
-                    }
-                }
-            )
-        },
-        bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp
-            ) {
-                NavigationBarItem(
-                    selected = false,
-                    onClick = onNavigateToDrink,
-                    icon = { Text("☕", fontSize = 20.sp) },
-                    label = { Text("喝水", fontSize = 11.sp) }
-                )
-                NavigationBarItem(
-                    selected = true,
-                    onClick = { },
-                    icon = { Text("📜", fontSize = 20.sp) },
-                    label = { Text("歷史記錄", fontSize = 11.sp) }
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = onNavigateToSettings,
-                    icon = { Text("⚙️", fontSize = 20.sp) },
-                    label = { Text("設定", fontSize = 11.sp) }
-                )
-            }
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // 預留 88.dp 避開 SmartCoasterApp 全域 TopAppBar 遮擋
+        Spacer(modifier = Modifier.height(88.dp))
+
+        // 1. 本週飲水量圖表卡片
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            // 1. 本週飲水量圖表卡片
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // 卡片標題與選單
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "本週飲水量",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-
-                        Box {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                modifier = Modifier.clickable { isDropdownExpanded = true }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Text(selectedRange, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text("▾", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                            DropdownMenu(
-                                expanded = isDropdownExpanded,
-                                onDismissRequest = { isDropdownExpanded = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("本週") },
-                                    onClick = { selectedRange = "本週"; isDropdownExpanded = false }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("上週") },
-                                    onClick = { selectedRange = "上週"; isDropdownExpanded = false }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("本月") },
-                                    onClick = { selectedRange = "本月"; isDropdownExpanded = false }
-                                )
-                            }
-                        }
-                    }
-
-                    // 柱狀圖繪製 (包含下方一到日標籤)
-                    WeeklyBarChart(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(180.dp)
-                    )
-
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                        thickness = 1.dp
-                    )
-
-                    // 數據彙整（平均日飲水 & 達成率）
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Bottom
-                    ) {
-                        Column {
-                            Text(
-                                text = "平均日飲水",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Row(verticalAlignment = Alignment.Bottom) {
-                                Text(
-                                    text = "1,850",
-                                    fontSize = 26.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "ml",
-                                    fontSize = 14.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(bottom = 3.dp, start = 4.dp)
-                                )
-                            }
-                        }
-
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = "達成率",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "92%",
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
-            }
-
-            // 2. 最近記錄列表
             Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // 卡片標題與選單
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "最近記錄",
+                        text = "本週飲水量",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { }
-                    ) {
-                        Text(
-                            text = "顯示全部",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Spacer(modifier = Modifier.width(2.dp))
-                        Text("›", fontSize = 16.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+
+                    Box {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.clickable { isDropdownExpanded = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(selectedRange, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("▾", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = isDropdownExpanded,
+                            onDismissRequest = { isDropdownExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("本週") },
+                                onClick = { selectedRange = "本週"; isDropdownExpanded = false }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("上週") },
+                                onClick = { selectedRange = "上週"; isDropdownExpanded = false }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("本月") },
+                                onClick = { selectedRange = "本月"; isDropdownExpanded = false }
+                            )
+                        }
                     }
                 }
 
-                // 分組 1: 今天
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "今天",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 4.dp)
-                    )
+                // 柱狀圖繪製 (包含下方一到日標籤)
+                WeeklyBarChart(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                )
 
-                    RecordCardItem(
-                        iconEmoji = "💧",
-                        title = "智能馬克杯",
-                        time = "14:30",
-                        valueText = "+250ml",
-                        isBlueValue = true
-                    )
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                    thickness = 1.dp
+                )
 
-                    RecordCardItem(
-                        iconEmoji = "☕",
-                        title = "手動記錄 (咖啡)",
-                        time = "10:15",
-                        amountText = "+300ml",
-                        valueText = "+300ml",
-                        isBlueValue = false
-                    )
+                // 數據彙整（平均日飲水 & 達成率）
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    Column {
+                        Text(
+                            text = "平均日飲水",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(
+                                text = "1,850",
+                                fontSize = 26.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "ml",
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(bottom = 3.dp, start = 4.dp)
+                            )
+                        }
+                    }
 
-                    RecordCardItem(
-                        iconEmoji = "💧",
-                        title = "智能馬克杯",
-                        time = "08:45",
-                        valueText = "+450ml",
-                        isBlueValue = true
-                    )
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "達成率",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "92%",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
+            }
+        }
 
-                // 分組 2: 昨天
-                Column(
-                    modifier = Modifier.padding(top = 6.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+        // 2. 最近記錄列表
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "最近記錄",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { }
                 ) {
                     Text(
-                        text = "昨天",
+                        text = "顯示全部",
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 4.dp)
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium
                     )
-
-                    RecordCardItem(
-                        iconEmoji = "💧",
-                        title = "智能馬克杯",
-                        time = "21:10",
-                        valueText = "+200ml",
-                        isBlueValue = true
-                    )
-
-                    RecordCardItem(
-                        iconEmoji = "✏️",
-                        title = "目標調整",
-                        time = "15:00",
-                        valueText = "已更新至 2000ml",
-                        isBlueValue = false,
-                        isSecondaryText = true
-                    )
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text("›", fontSize = 16.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // 分組 1: 今天
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "今天",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+
+                RecordCardItem(
+                    iconEmoji = "💧",
+                    title = "智能馬克杯",
+                    time = "14:30",
+                    valueText = "+250ml",
+                    isBlueValue = true
+                )
+
+                RecordCardItem(
+                    iconEmoji = "☕",
+                    title = "手動記錄 (咖啡)",
+                    time = "10:15",
+                    amountText = "+300ml",
+                    valueText = "+300ml",
+                    isBlueValue = false
+                )
+
+                RecordCardItem(
+                    iconEmoji = "💧",
+                    title = "智能馬克杯",
+                    time = "08:45",
+                    valueText = "+450ml",
+                    isBlueValue = true
+                )
+            }
+
+            // 分組 2: 昨天
+            Column(
+                modifier = Modifier.padding(top = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "昨天",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+
+                RecordCardItem(
+                    iconEmoji = "💧",
+                    title = "智能馬克杯",
+                    time = "21:10",
+                    valueText = "+200ml",
+                    isBlueValue = true
+                )
+
+                RecordCardItem(
+                    iconEmoji = "✏️",
+                    title = "目標調整",
+                    time = "15:00",
+                    valueText = "已更新至 2000ml",
+                    isBlueValue = false,
+                    isSecondaryText = true
+                )
+            }
         }
+
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
