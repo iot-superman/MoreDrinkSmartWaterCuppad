@@ -33,14 +33,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-fun Page4(
+fun DrinkStep2(
     realTimeWeight: Float = 0f,
     isStable: Boolean = false,
     startWeight: Float = 0f,
     endWeight: Float = 0f,
     isRead: Boolean = false,
     onReadWeight: () -> Unit = {},
-    onNavigateToPage7: () -> Unit = {},
+    onNavigateToDrinkStep3: () -> Unit = {},
     onBackClick: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
@@ -172,7 +172,6 @@ fun Page4(
 
                     ) {
                         Text(
-                            // Page 4：依需求固定顯示「已放回」，不再依 isRead / isStable 切換文字。
                             text = "我放回水杯了",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
@@ -198,8 +197,6 @@ fun Page4(
                         Spacer(modifier = Modifier.height(16.dp))
                         Row(verticalAlignment = Alignment.Bottom) {
                             Text(
-                                // Page 4：主重量區永遠顯示 MQTT 最新的即時重量。
-                                // 不再等待按下「已放回」才顯示，也不使用 --.- placeholder。
                                 text = String.format("%.1f", realTimeWeight),
                                 fontSize = 42.sp,
                                 fontWeight = FontWeight.Light,
@@ -276,7 +273,7 @@ fun Page4(
                     exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
                 ) {
                     Surface(
-                        onClick = onNavigateToPage7,
+                        onClick = onNavigateToDrinkStep3,
                         enabled = isRead,
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.primary,
@@ -301,23 +298,6 @@ fun Page4(
             }
         }
 
-//        // 4. 按鈕區
-//        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-//            val diff = kotlin.math.abs(startWeight - endWeight)
-//            Button(
-//                onClick = onNavigateToPage7,
-//                enabled = isRead,
-//                shape = RoundedCornerShape(28.dp),
-//                modifier = Modifier.fillMaxWidth().height(50.dp)
-//            ) {
-//                Text("確認存入飲水量 (+${String.format("%.0f", diff)}ml)", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-//            }
-////            TextButton(onClick = onBackClick, modifier = Modifier.fillMaxWidth()) {
-////                Text("重新偵測放回重量", color = MaterialTheme.colorScheme.onSurfaceVariant)
-////            }
-//        }
-        
-        // 額外留白確保底部不會被遮擋
         Spacer(modifier = Modifier.height(20.dp))
     }
 }
@@ -341,9 +321,9 @@ fun Step2StepLabel(number: String, title: String, isActive: Boolean, isDone: Boo
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
-fun Page4Preview() {
+fun DrinkStep2Preview() {
     SmartCoasterTheme {
-        Page4(
+        DrinkStep2(
             startWeight = 320.5f,
             endWeight = 85.5f,
             isRead = true
