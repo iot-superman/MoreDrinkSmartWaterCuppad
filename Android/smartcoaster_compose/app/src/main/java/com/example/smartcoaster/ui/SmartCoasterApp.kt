@@ -105,9 +105,9 @@ fun SmartCoasterApp() {
                         if (showBackButton) {
                             IconButton(onClick = {
                                 currentSubPage = when (currentSubPage) {
-                                    "Page2" -> "Main"
-                                    "Page4" -> "Page2"
-                                    "Page7" -> "Page4"
+                                    "DrinkStep1" -> "Main"
+                                    "DrinkStep2" -> "DrinkStep1"
+                                    "DrinkStep3" -> "DrinkStep2"
                                     else -> "Main"
                                 }
                             }) {
@@ -151,7 +151,7 @@ fun SmartCoasterApp() {
                             totalIntake = coasterState.totalIntake,
                             previousIntake = coasterState.previousTotalIntake,
                             realTimeWeight = coasterState.realTimeWeight,
-                            onNavigateToPage2 = {
+                            onNavigateToDrinkStep1 = {
                                 // 進入手動飲水模式只切換模式，不再自動 Tare。
                                 // START 必須保留杯子目前的真實重量；若在這裡 Tare，
                                 // 會把杯重歸近 0，造成「不穩定中」以及 Start = 0 / -0.x 的錯誤。
@@ -160,13 +160,13 @@ fun SmartCoasterApp() {
                                 coasterState.isEndRead = false
                                 // 進入流程時，同步舊數值
                                 coasterState.previousTotalIntake = coasterState.totalIntake
-                                currentSubPage = "Page2"
+                                currentSubPage = "DrinkStep1"
                             },
                             onTareClick = {
                                 mqttManager.publish("tare")
                             }
                         )
-                        "Page2" -> Page2(
+                        "DrinkStep1" -> DrinkStep1(
                             realTimeWeight = coasterState.realTimeWeight,
                             isStable = coasterState.isStable,
                             startWeight = coasterState.startWeight,
@@ -178,13 +178,13 @@ fun SmartCoasterApp() {
                                 coasterState.startWeight = coasterState.realTimeWeight
                                 coasterState.isStartRead = true
                             },
-                            onNavigateToPage4 = { currentSubPage = "Page4" },
+                            onNavigateToDrinkStep2 = { currentSubPage = "DrinkStep2" },
                             onBackClick = {
                                 mqttManager.publish("legacyauto")
                                 currentSubPage = "Main"
                             }
                         )
-                        "Page4" -> Page4(
+                        "DrinkStep2" -> DrinkStep2(
                             realTimeWeight = coasterState.realTimeWeight,
                             isStable = coasterState.isStable,
                             startWeight = coasterState.startWeight,
@@ -195,17 +195,17 @@ fun SmartCoasterApp() {
                                 coasterState.endWeight = coasterState.realTimeWeight
                                 coasterState.isEndRead = true
                             },
-                            onNavigateToPage7 = {
+                            onNavigateToDrinkStep3 = {
                                 coasterState.intakeAmount = kotlin.math.abs(coasterState.startWeight - coasterState.endWeight)
                                 coasterState.totalIntake += coasterState.intakeAmount
-                                currentSubPage = "Page7"
+                                currentSubPage = "DrinkStep3"
                             },
                             onBackClick = { 
-                                // 返回 Page2 時不需要重新 tare，只需切換頁面
-                                currentSubPage = "Page2" 
+                                // 返回 DrinkStep1 時不需要重新 tare，只需切換頁面
+                                currentSubPage = "DrinkStep1" 
                             }
                         )
-                        "Page7" -> Page7(
+                        "DrinkStep3" -> DrinkStep3(
                             intakeAmount = coasterState.intakeAmount,
                             totalIntake = coasterState.totalIntake,
                             onNavigateToHome = {
@@ -213,7 +213,7 @@ fun SmartCoasterApp() {
                                 currentSubPage = "Main"
                             },
                             onNavigateToHistory = { selectedTab = 1 },
-                            onBackClick = { currentSubPage = "Page4" }
+                            onBackClick = { currentSubPage = "DrinkStep2" }
                         )
                     }
                 }
