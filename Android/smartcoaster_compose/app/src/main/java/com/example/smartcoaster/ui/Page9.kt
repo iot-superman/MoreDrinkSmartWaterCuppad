@@ -1,4 +1,4 @@
-package com.example.drinkwater
+package com.example.smartcoaster.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,7 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.drinkwater.ui.theme.DrinkWaterTheme
+import com.example.smartcoaster.ui.theme.SmartCoasterTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -249,7 +249,7 @@ fun SettingRowItem(
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun Page9Preview() {
-    DrinkWaterTheme {
+    SmartCoasterTheme {
         Page9()
     }
 }

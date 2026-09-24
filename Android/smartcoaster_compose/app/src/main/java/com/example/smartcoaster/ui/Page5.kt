@@ -1,4 +1,4 @@
-package com.example.drinkwater
+package com.example.smartcoaster.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -22,7 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.drinkwater.ui.theme.DrinkWaterTheme
+import com.example.smartcoaster.ui.theme.SmartCoasterTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -452,7 +452,7 @@ fun RecordCardItem(
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun Page5Preview() {
-    DrinkWaterTheme {
+    SmartCoasterTheme {
         Page5()
     }
 }
