@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -24,34 +25,39 @@ class CoasterState {
     var isStartRead by mutableStateOf(false)
     var isEndRead by mutableStateOf(false)
     var deviceMode by mutableStateOf("AUTO")
-    
+
     var realTimeWeight by mutableFloatStateOf(0f)
     var isStable by mutableStateOf(false)
     var intakeAmount by mutableFloatStateOf(0f)
-    var totalIntake by mutableFloatStateOf(800f) 
-    var previousTotalIntake by mutableFloatStateOf(800f) // 紀錄加水前的舊數值
+    var totalIntake by mutableFloatStateOf(800f)
+    var previousTotalIntake by mutableFloatStateOf(800f)
 }
 
 @Composable
 fun SmartCoasterApp() {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var selectedTab by remember { mutableIntStateOf(0) }
     var currentSubPage by remember { mutableStateOf("Main") }
+    var settingSubPage by remember { mutableStateOf("SettingMain") }
+
     var mqttStatus by remember { mutableStateOf("Initializing...") }
     var lastLog by remember { mutableStateOf("Ready") }
 
-    // Tare Popup 狀態：只有收到 ESP32 的 Tare 開始訊息才顯示。
-    // 收到 TARE_DONE 後先顯示 100% 約 0.5 秒，再自動消失。
+    // 初始化 BleManager 真實藍牙管理器
+    val bleManager = remember { BleManager(context) }
+    val bleConnectionState by bleManager.connectionState.collectAsState()
+    val connectedDeviceName by bleManager.connectedDeviceName.collectAsState()
+
+    // Tare Popup 狀態
     var showTareDialog by remember { mutableStateOf(false) }
     var tareDone by remember { mutableStateOf(false) }
-    
+
     val coasterState = remember { CoasterState() }
 
     val mqttManager = remember {
         MqttManager(
-            onWeightReceived = { weight ->
-                coasterState.realTimeWeight = weight
-            },
+            onWeightReceived = { weight -> coasterState.realTimeWeight = weight },
             onStatusChanged = { status -> mqttStatus = status },
             onLogReceived = { log -> lastLog = log },
             onModeConfirmed = { mode -> coasterState.deviceMode = mode },
@@ -61,8 +67,6 @@ fun SmartCoasterApp() {
                     tareDone = false
                     showTareDialog = true
                 } else if (showTareDialog) {
-                    // TARE_DONE / TARE_ERROR 到達。正常 TARE_DONE 會讓動畫到 100%。
-                    // 現有韌體正常流程使用 TARE_DONE；Popup 隨後自動關閉。
                     tareDone = true
                 }
             }
@@ -75,21 +79,30 @@ fun SmartCoasterApp() {
         }
     }
 
-    val showBackButton = selectedTab == 0 && currentSubPage != "Main"
+    val showBackButton = (selectedTab == 0 && currentSubPage != "Main") ||
+            (selectedTab == 2 && settingSubPage != "SettingMain")
 
     Scaffold(
         topBar = {
             Column {
+                // 最頂端狀態條：顯示 MQTT 與 BLE 藍牙連線狀態
                 Surface(
-                    color = when(mqttStatus) {
-                        "Connected" -> Color(0xFF4CAF50)
-                        "Error" -> Color(0xFFF44336)
+                    color = when {
+                        bleConnectionState is BleConnectionState.Connected -> Color(0xFF2196F3) // 藍牙連線成功顯示藍色
+                        mqttStatus == "Connected" -> Color(0xFF4CAF50)
+                        mqttStatus == "Error" -> Color(0xFFF44336)
                         else -> Color(0xFFFF9800)
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
+                    val bleStatusText = when (bleConnectionState) {
+                        is BleConnectionState.Connected -> "BLE: 已連線 ($connectedDeviceName)"
+                        is BleConnectionState.Connecting -> "BLE: 正在建立藍牙連線..."
+                        is BleConnectionState.Error -> "BLE 錯誤: ${(bleConnectionState as BleConnectionState.Error).message}"
+                        else -> "Status: $mqttStatus | $lastLog"
+                    }
                     Text(
-                        text = "Status: $mqttStatus | $lastLog",
+                        text = bleStatusText,
                         color = Color.White,
                         fontSize = 10.sp,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
@@ -104,11 +117,15 @@ fun SmartCoasterApp() {
                     ) {
                         if (showBackButton) {
                             IconButton(onClick = {
-                                currentSubPage = when (currentSubPage) {
-                                    "DrinkStep1" -> "Main"
-                                    "DrinkStep2" -> "DrinkStep1"
-                                    "DrinkStep3" -> "DrinkStep2"
-                                    else -> "Main"
+                                if (selectedTab == 0) {
+                                    currentSubPage = when (currentSubPage) {
+                                        "DrinkStep1" -> "Main"
+                                        "DrinkStep2" -> "DrinkStep1"
+                                        "DrinkStep3" -> "DrinkStep2"
+                                        else -> "Main"
+                                    }
+                                } else if (selectedTab == 2) {
+                                    settingSubPage = "SettingMain"
                                 }
                             }) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -120,7 +137,13 @@ fun SmartCoasterApp() {
                         val title = when (selectedTab) {
                             0 -> if (currentSubPage == "Main") "Drinking Water" else "Manual Intake"
                             1 -> "History"
-                            else -> "Settings"
+                            else -> when (settingSubPage) {
+                                "FindDevice" -> "Find Device"
+                                "Page1" -> "Wi-Fi Setting"
+                                "ConnectSuccess" -> "Connection Result"
+                                "Page8" -> "Device Settings"
+                                else -> "Settings"
+                            }
                         }
                         Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
 
@@ -138,8 +161,13 @@ fun SmartCoasterApp() {
                     if (currentSubPage != "Main") mqttManager.publish("legacyauto")
                     currentSubPage = "Main"
                 }
-                NavItem(Icons.Default.History, "歷史記錄", 1, selectedTab) { selectedTab = 1 }
-                NavItem(Icons.Default.Settings, "設定", 2, selectedTab) { selectedTab = 2 }
+                NavItem(Icons.Default.History, "歷史記錄", 1, selectedTab) {
+                    selectedTab = 1
+                }
+                NavItem(Icons.Default.Settings, "設定", 2, selectedTab) {
+                    selectedTab = 2
+                    settingSubPage = "SettingMain"
+                }
             }
         }
     ) { padding ->
@@ -152,19 +180,13 @@ fun SmartCoasterApp() {
                             previousIntake = coasterState.previousTotalIntake,
                             realTimeWeight = coasterState.realTimeWeight,
                             onNavigateToDrinkStep1 = {
-                                // 進入手動飲水模式只切換模式，不再自動 Tare。
-                                // START 必須保留杯子目前的真實重量；若在這裡 Tare，
-                                // 會把杯重歸近 0，造成「不穩定中」以及 Start = 0 / -0.x 的錯誤。
                                 mqttManager.publish("manualdrink")
                                 coasterState.isStartRead = false
                                 coasterState.isEndRead = false
-                                // 進入流程時，同步舊數值
                                 coasterState.previousTotalIntake = coasterState.totalIntake
                                 currentSubPage = "DrinkStep1"
                             },
-                            onTareClick = {
-                                mqttManager.publish("tare")
-                            }
+                            onTareClick = { mqttManager.publish("tare") }
                         )
                         "DrinkStep1" -> DrinkStep1(
                             realTimeWeight = coasterState.realTimeWeight,
@@ -172,9 +194,6 @@ fun SmartCoasterApp() {
                             startWeight = coasterState.startWeight,
                             isRead = coasterState.isStartRead,
                             onReadWeight = {
-                                // START：直接記住畫面目前正在收到的即時重量。
-                                // 不送 tare、不送 getweight、不等待硬體重新量測，
-                                // 因此不會因重新 Tare 進入「不穩定中」，也不會有 MQTT 回覆競速問題。
                                 coasterState.startWeight = coasterState.realTimeWeight
                                 coasterState.isStartRead = true
                             },
@@ -191,7 +210,6 @@ fun SmartCoasterApp() {
                             endWeight = coasterState.endWeight,
                             isRead = coasterState.isEndRead,
                             onReadWeight = {
-                                // END：同樣直接記住目前即時重量，不 Tare、不重新量測。
                                 coasterState.endWeight = coasterState.realTimeWeight
                                 coasterState.isEndRead = true
                             },
@@ -200,10 +218,7 @@ fun SmartCoasterApp() {
                                 coasterState.totalIntake += coasterState.intakeAmount
                                 currentSubPage = "DrinkStep3"
                             },
-                            onBackClick = { 
-                                // 返回 DrinkStep1 時不需要重新 tare，只需切換頁面
-                                currentSubPage = "DrinkStep1" 
-                            }
+                            onBackClick = { currentSubPage = "DrinkStep1" }
                         )
                         "DrinkStep3" -> DrinkStep3(
                             intakeAmount = coasterState.intakeAmount,
@@ -217,12 +232,47 @@ fun SmartCoasterApp() {
                         )
                     }
                 }
-                1 -> PlaceholderScreen(Icons.Default.History, "歷史記錄", "紀錄內容...")
-                else -> PlaceholderScreen(Icons.Default.Settings, "設定", "設定內容...")
+                1 -> {
+                    Page5(
+                        onNavigateToDrink = { selectedTab = 0 },
+                        onNavigateToSettings = { selectedTab = 2 }
+                    )
+                }
+                2 -> {
+                    when (settingSubPage) {
+                        "SettingMain" -> Setting(
+                            onNavigateToDeviceConnection = { settingSubPage = "FindDevice" },
+                            onNavigateToDeviceSettings = { settingSubPage = "Page8" }
+                        )
+                        "FindDevice" -> Page3(
+                            onNavigateToNext = { macAddress, requiresPassword ->
+                                // 發起對 ESP32 底層真實 BLE GATT 連線！
+                                bleManager.connect(macAddress)
+
+                                if (requiresPassword) {
+                                    settingSubPage = "Page1"
+                                } else {
+                                    settingSubPage = "ConnectSuccess"
+                                }
+                            },
+                            onBackClick = { settingSubPage = "SettingMain" }
+                        )
+                        "Page1" -> Page1(
+                            onNavigateToNext = { settingSubPage = "ConnectSuccess" },
+                            onBackClick = { settingSubPage = "FindDevice" }
+                        )
+                        "ConnectSuccess" -> ConnectSuccess(
+                            onBackClick = { settingSubPage = "SettingMain" }
+                        )
+                        "Page8" -> Page8(
+                            onNavigateToHome = { selectedTab = 0 },
+                            onNavigateToHistory = { selectedTab = 1 },
+                            onBackClick = { settingSubPage = "SettingMain" }
+                        )
+                    }
+                }
             }
 
-            // 全 App 共用的 Tare 校準 Popup。
-            // 不論目前在哪個頁面，只要 MQTT 偵測到 ESP32 正在 Tare 就覆蓋顯示。
             TareCalibrationDialog(
                 visible = showTareDialog,
                 tareDone = tareDone,
@@ -238,13 +288,4 @@ fun SmartCoasterApp() {
 @Composable
 private fun RowScope.NavItem(icon: ImageVector, label: String, index: Int, selected: Int, onClick: () -> Unit) {
     NavigationBarItem(selected = selected == index, onClick = onClick, icon = { Icon(icon, null) }, label = { Text(label, fontSize = 11.sp) })
-}
-
-@Composable
-private fun PlaceholderScreen(icon: ImageVector, title: String, body: String) {
-    Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Icon(icon, null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
-        Text(title, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
-        Text(body, modifier = Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
 }

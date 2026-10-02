@@ -29,12 +29,9 @@ fun Setting(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // 預留 88.dp 避開 SmartCoasterApp 全域 TopAppBar 遮擋
-        Spacer(modifier = Modifier.height(88.dp))
-
         // 1. 設備管理
         SettingSection(title = "設備管理") {
             SettingRowItem(
