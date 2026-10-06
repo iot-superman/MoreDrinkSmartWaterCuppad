@@ -33,13 +33,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-fun Page2(
+fun DrinkStep1(
     realTimeWeight: Float = 0f,
     isStable: Boolean = false,
     startWeight: Float = 0f,
     isRead: Boolean = false,
     onReadWeight: () -> Unit = {},
-    onNavigateToPage4: () -> Unit = {},
+    onNavigateToDrinkStep2: () -> Unit = {},
     onBackClick: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
@@ -274,7 +274,7 @@ fun Page2(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(
-                onClick = onNavigateToPage4,
+                onClick = onNavigateToDrinkStep2,
                 enabled = isRead,
                 shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
@@ -439,8 +439,8 @@ fun InteractiveCupIllustration(
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
-fun Page2Preview() {
+fun DrinkStep1Preview() {
     SmartCoasterTheme {
-        Page2()
+        DrinkStep1()
     }
 }

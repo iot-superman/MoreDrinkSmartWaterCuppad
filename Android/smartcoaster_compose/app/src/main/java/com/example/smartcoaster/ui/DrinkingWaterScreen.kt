@@ -38,7 +38,7 @@ fun DrinkingWaterScreen(
     totalIntake: Float = 0f,
     previousIntake: Float = totalIntake, // 預設值為當前值
     realTimeWeight: Float = 0f,
-    onNavigateToPage2: () -> Unit = {},
+    onNavigateToDrinkStep1: () -> Unit = {},
     onTareClick: () -> Unit = {}
 ) {
     // 內部狀態用來觸發動畫
@@ -86,7 +86,7 @@ fun DrinkingWaterScreen(
                 HumanWaterIndicator(animatedProgress, Modifier.size(width = 140.dp, height = 280.dp))
             }
             FloatingActionButton(
-                onClick = onNavigateToPage2,
+                onClick = onNavigateToDrinkStep1,
                 modifier = Modifier.align(Alignment.CenterEnd), containerColor = MaterialTheme.colorScheme.primary
             ) { Icon(Icons.Default.Add, "新增飲水紀錄", tint = Color.White) }
         }

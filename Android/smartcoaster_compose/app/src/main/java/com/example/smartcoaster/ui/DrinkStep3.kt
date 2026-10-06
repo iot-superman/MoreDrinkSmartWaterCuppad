@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.example.smartcoaster.ui.theme.SmartCoasterTheme
 
 @Composable
-fun Page7(
+fun DrinkStep3(
     intakeAmount: Float = 0f,
     totalIntake: Float = 0f,
     onNavigateToHome: () -> Unit = {},
@@ -205,34 +205,6 @@ fun Page7(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
             modifier = Modifier.fillMaxWidth()
         ) {
-//            Row(
-//                modifier = Modifier.padding(16.dp),
-//                verticalAlignment = Alignment.Top,
-//                horizontalArrangement = Arrangement.spacedBy(12.dp)
-//            ) {
-//                Box(
-//                    modifier = Modifier
-//                        .size(40.dp)
-//                        .clip(CircleShape)
-//                        .background(Color(0xFFD8E2FF)),
-//                    contentAlignment = Alignment.Center
-//                ) {
-//                    Text("🔄", fontSize = 20.sp)
-//                }
-//                Column(modifier = Modifier.weight(1f)) {
-//                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-//                        PulsingDot()
-//                        Text("即將切回智慧背景監測", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-//                    }
-//                    Spacer(modifier = Modifier.height(4.dp))
-//                    Text(
-//                        "點擊按鈕後裝置將自動切回 legacyauto 節能常態監聽。水杯放置桌面上將持續偵測下一回飲水。",
-//                        fontSize = 12.sp,
-//                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-//                        lineHeight = 16.sp
-//                    )
-//                }
-//            }
         }
 
         Surface(
@@ -266,8 +238,6 @@ fun Page7(
                     Text("完成並返回", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
-
-
         }
     }
 }
@@ -328,10 +298,10 @@ fun CelebrationBadge(modifier: Modifier = Modifier) {
     }
 }
 
-@Preview(showBackground = true, showSystemUi = true, name = "Page7 Initial")
+@Preview(showBackground = true, showSystemUi = true, name = "DrinkStep3 Initial")
 @Composable
-fun Page7Preview() {
+fun DrinkStep3Preview() {
     SmartCoasterTheme {
-        Page7()
+        DrinkStep3()
     }
 }

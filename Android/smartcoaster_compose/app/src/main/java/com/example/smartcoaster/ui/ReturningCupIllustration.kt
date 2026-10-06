@@ -41,7 +41,7 @@ fun ReturningCupIllustration(
     
     val progress = returnProgress.value
     
-    // 與 Page2 對應的位移參數 (拿起狀態：Y:-90, X:60, Rot:45)
+    // 與 DrinkStep1 對應的位移參數 (拿起狀態：Y:-90, X:60, Rot:45)
     val translateY = progress * -90f
     val translateX = progress * 60f
     val rotation = progress * 45f
