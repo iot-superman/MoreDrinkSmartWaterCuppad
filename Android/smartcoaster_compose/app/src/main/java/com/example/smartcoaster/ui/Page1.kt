@@ -32,7 +32,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.sin
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Page1(
     onNavigateToNext: () -> Unit = {},
@@ -49,113 +48,16 @@ fun Page1(
 
     val coroutineScope = rememberCoroutineScope()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Device Connection",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Text("←", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    }
-                },
-                actions = {
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 16.dp)
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("👤", fontSize = 16.sp)
-                    }
-                }
-            )
-        },
-        bottomBar = {
-            // 底部固定滿版按鈕
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 8.dp,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 16.dp)
-                ) {
-                    Button(
-                        onClick = {
-                            if (password.isBlank()) {
-                                isPasswordError = true
-                            } else {
-                                isPasswordError = false
-                                coroutineScope.launch {
-                                    syncStatus = 1 // 進入同步中
-                                    delay(2500)
-                                    syncStatus = 2 // 完成同步
-                                    delay(800)     // 停頓 0.8 秒展示完成圖示
-                                    onNavigateToNext() // 自動跳轉至下一頁
-                                }
-                            }
-                        },
-                        enabled = syncStatus != 1,
-                        shape = RoundedCornerShape(28.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (syncStatus == 2) Color(0xFFD7E5ED) else MaterialTheme.colorScheme.primary,
-                            contentColor = if (syncStatus == 2) Color(0xFF101D23) else MaterialTheme.colorScheme.onPrimary
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(54.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            when (syncStatus) {
-                                0 -> {
-                                    Text("同步至設備", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("➔", fontSize = 18.sp)
-                                }
-                                1 -> {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                        strokeWidth = 2.dp
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text("同步中...", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                }
-                                2 -> {
-                                    Text("✔", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("設定完成", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    ) { innerPadding ->
+    Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
+            // 預留 88.dp 避開 SmartCoasterApp 的全域 TopAppBar
+            Spacer(modifier = Modifier.height(88.dp))
 
             // 1. 頂部設備連線繪圖動畫 (Device & Coaster Canvas Animation)
             DeviceConnectionAnimation(
@@ -297,7 +199,76 @@ fun Page1(
                 )
             }
 
-            Spacer(modifier = Modifier.height(120.dp)) // 留白避免被底部按鈕遮擋
+            Spacer(modifier = Modifier.height(100.dp)) // 留白避免被底部按鈕遮擋
+        }
+
+        // 5. 底部固定動作按鈕
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+            ) {
+                Button(
+                    onClick = {
+                        if (password.isBlank()) {
+                            isPasswordError = true
+                        } else {
+                            isPasswordError = false
+                            coroutineScope.launch {
+                                syncStatus = 1 // 進入同步中
+                                delay(2500)
+                                syncStatus = 2 // 完成同步
+                                delay(800)     // 停頓 0.8 秒展示完成圖示
+                                onNavigateToNext() // 自動跳轉至下一頁
+                            }
+                        }
+                    },
+                    enabled = syncStatus != 1,
+                    shape = RoundedCornerShape(28.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (syncStatus == 2) Color(0xFFD7E5ED) else MaterialTheme.colorScheme.primary,
+                        contentColor = if (syncStatus == 2) Color(0xFF101D23) else MaterialTheme.colorScheme.onPrimary
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        when (syncStatus) {
+                            0 -> {
+                                Text("同步至設備", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("➔", fontSize = 18.sp)
+                            }
+                            1 -> {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text("同步中...", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            }
+                            2 -> {
+                                Text("✔", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("設定完成", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -307,7 +278,6 @@ fun Page1(
 fun DeviceConnectionAnimation(modifier: Modifier = Modifier) {
     val infiniteTransition = rememberInfiniteTransition(label = "wifiWave")
 
-    // 手機與杯墊浮動動畫
     val floatY by infiniteTransition.animateFloat(
         initialValue = -3f,
         targetValue = 3f,
@@ -318,7 +288,6 @@ fun DeviceConnectionAnimation(modifier: Modifier = Modifier) {
         label = "float"
     )
 
-    // 波浪擴散動畫
     val waveOffset by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
@@ -336,7 +305,6 @@ fun DeviceConnectionAnimation(modifier: Modifier = Modifier) {
         val height = size.height
         val centerY = height / 2f
 
-        // 1. 左側手機繪製
         val phoneX = width * 0.2f
         val phoneWidth = 36f
         val phoneHeight = 72f
@@ -358,7 +326,6 @@ fun DeviceConnectionAnimation(modifier: Modifier = Modifier) {
             center = Offset(phoneX, centerY + floatY)
         )
 
-        // 2. 右側杯墊繪製
         val coasterX = width * 0.8f
         drawOval(
             color = Color(0xFFF2F2F7),
@@ -376,7 +343,6 @@ fun DeviceConnectionAnimation(modifier: Modifier = Modifier) {
             size = Size(32f, 10f)
         )
 
-        // 3. 中間 Wi-Fi 動態傳輸波浪
         val waveStartX = phoneX + 25f
         val waveEndX = coasterX - 35f
         val waveDistance = waveEndX - waveStartX

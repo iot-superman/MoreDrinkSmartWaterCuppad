@@ -1,11 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- 飲水機地圖使用目前位置搜尋附近點位；Android 6 以上仍會由 App 動態詢問使用者。 -->
+
+    <!-- 找水喝：定位權限 -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
-    <application android:theme="@style/Theme.SmartCoaster" android:label="Smart Coaster">
+    <!-- 新版 Page9 / Page3 / BleManager：BLE 權限 -->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
+
+    <application
+        android:theme="@style/Theme.SmartCoaster"
+        android:label="Smart Coaster">
         <activity
             android:name=".MainActivity"
             android:exported="true"

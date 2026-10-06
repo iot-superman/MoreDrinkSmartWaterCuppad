@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,9 +36,11 @@ class CoasterState {
 
 @Composable
 fun SmartCoasterApp() {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var selectedTab by remember { mutableIntStateOf(0) }
     var currentSubPage by remember { mutableStateOf("Main") }
+    var settingSubPage by remember { mutableStateOf("SettingMain") }
     var mqttStatus by remember { mutableStateOf("Initializing...") }
     var lastLog by remember { mutableStateOf("Ready") }
 
@@ -45,6 +48,11 @@ fun SmartCoasterApp() {
     // 使用 rememberSaveable 可避免畫面旋轉等 Activity 重建時重複定位；
     // 使用者完整關閉並重新開啟 App 後，新的工作階段會重新設為 true。
     var forceFreshMapSearch by rememberSaveable { mutableStateOf(true) }
+
+    // 新版設定頁共用 BLE 管理器
+    val bleManager = remember { BleManager(context) }
+    val bleConnectionState by bleManager.connectionState.collectAsState()
+    val connectedDeviceName by bleManager.connectedDeviceName.collectAsState()
 
     // Tare Popup 狀態：只有收到 ESP32 的 Tare 開始訊息才顯示。
     // 收到 TARE_DONE 後先顯示 100% 約 0.5 秒，再自動消失。
@@ -81,7 +89,8 @@ fun SmartCoasterApp() {
         }
     }
 
-    val showBackButton = selectedTab == 0 && currentSubPage != "Main"
+    val showBackButton = (selectedTab == 0 && currentSubPage != "Main") ||
+            (selectedTab == 3 && settingSubPage != "SettingMain")
 
     Scaffold(
         topBar = {
@@ -90,15 +99,22 @@ fun SmartCoasterApp() {
             if (selectedTab != 1) {
                 Column {
                     Surface(
-                        color = when(mqttStatus) {
-                            "Connected" -> Color(0xFF4CAF50)
-                            "Error" -> Color(0xFFF44336)
+                        color = when {
+                            bleConnectionState is BleConnectionState.Connected -> Color(0xFF2196F3)
+                            mqttStatus == "Connected" -> Color(0xFF4CAF50)
+                            mqttStatus == "Error" -> Color(0xFFF44336)
                             else -> Color(0xFFFF9800)
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
+                        val statusText = when (bleConnectionState) {
+                            is BleConnectionState.Connected -> "BLE: 已連線 ($connectedDeviceName)"
+                            is BleConnectionState.Connecting -> "BLE: 正在建立藍牙連線..."
+                            is BleConnectionState.Error -> "BLE 錯誤: ${(bleConnectionState as BleConnectionState.Error).message}"
+                            else -> "Status: $mqttStatus | $lastLog"
+                        }
                         Text(
-                            text = "Status: $mqttStatus | $lastLog",
+                            text = statusText,
                             color = Color.White,
                             fontSize = 10.sp,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
@@ -113,11 +129,18 @@ fun SmartCoasterApp() {
                         ) {
                             if (showBackButton) {
                                 IconButton(onClick = {
-                                    currentSubPage = when (currentSubPage) {
-                                    "DrinkStep1" -> "Main"
-                                    "DrinkStep2" -> "DrinkStep1"
-                                    "DrinkStep3" -> "DrinkStep2"
-                                        else -> "Main"
+                                    if (selectedTab == 0) {
+                                        currentSubPage = when (currentSubPage) {
+                                            "DrinkStep1" -> "Main"
+                                            "DrinkStep2" -> "DrinkStep1"
+                                            "DrinkStep3" -> "DrinkStep2"
+                                            else -> "Main"
+                                        }
+                                    } else if (selectedTab == 3) {
+                                        settingSubPage = when (settingSubPage) {
+                                            "Page1" -> "FindDevice"
+                                            else -> "SettingMain"
+                                        }
                                     }
                                 }) {
                                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -129,7 +152,14 @@ fun SmartCoasterApp() {
                             val title = when (selectedTab) {
                                 0 -> if (currentSubPage == "Main") "Drinking Water" else "Manual Intake"
                                 2 -> "History"
-                                else -> "Settings"
+                                3 -> when (settingSubPage) {
+                                    "FindDevice" -> "Find Device"
+                                    "Page1" -> "Wi-Fi Setting"
+                                    "ConnectSuccess" -> "Connection Result"
+                                    "Page8" -> "Device Settings"
+                                    else -> "Settings"
+                                }
+                                else -> ""
                             }
                             Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
 
@@ -151,7 +181,10 @@ fun SmartCoasterApp() {
                 // 新增第 2 個 Tab：以原生 WebView 顯示附近飲水機地圖。
                 NavItem(Icons.Default.PinDrop, "找水喝", 1, selectedTab) { selectedTab = 1 }
                 NavItem(Icons.Default.History, "歷史記錄", 2, selectedTab) { selectedTab = 2 }
-                NavItem(Icons.Default.Settings, "設定", 3, selectedTab) { selectedTab = 3 }
+                NavItem(Icons.Default.Settings, "設定", 3, selectedTab) {
+                    selectedTab = 3
+                    settingSubPage = "SettingMain"
+                }
             }
         }
     ) { padding ->
@@ -237,8 +270,47 @@ fun SmartCoasterApp() {
                         forceFreshMapSearch = false
                     }
                 )
-                2 -> PlaceholderScreen(Icons.Default.History, "歷史記錄", "紀錄內容...")
-                else -> PlaceholderScreen(Icons.Default.Settings, "設定", "設定內容...")
+                2 -> {
+                    // 新版歷史記錄：Page5
+                    Page5(
+                        onNavigateToDrink = { selectedTab = 0 },
+                        onNavigateToSettings = {
+                            selectedTab = 3
+                            settingSubPage = "SettingMain"
+                        }
+                    )
+                }
+                3 -> {
+                    // 新版設定：Page9 的 Setting()，並串回已完成的設備流程
+                    when (settingSubPage) {
+                        "SettingMain" -> Setting(
+                            onNavigateToDeviceConnection = { settingSubPage = "FindDevice" },
+                            onNavigateToDeviceSettings = { settingSubPage = "Page8" }
+                        )
+                        "FindDevice" -> Page3(
+                            onNavigateToNext = { macAddress, requiresPassword ->
+                                bleManager.connect(macAddress)
+                                settingSubPage = if (requiresPassword) "Page1" else "ConnectSuccess"
+                            },
+                            onBackClick = { settingSubPage = "SettingMain" }
+                        )
+                        "Page1" -> Page1(
+                            onNavigateToNext = { settingSubPage = "ConnectSuccess" },
+                            onBackClick = { settingSubPage = "FindDevice" }
+                        )
+                        "ConnectSuccess" -> ConnectSuccess(
+                            onBackClick = { settingSubPage = "SettingMain" }
+                        )
+                        "Page8" -> Page8(
+                            onNavigateToHome = {
+                                selectedTab = 0
+                                currentSubPage = "Main"
+                            },
+                            onNavigateToHistory = { selectedTab = 2 },
+                            onBackClick = { settingSubPage = "SettingMain" }
+                        )
+                    }
+                }
             }
 
             // 全 App 共用的 Tare 校準 Popup。
