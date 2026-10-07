@@ -30,6 +30,7 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
+#include <ctype.h>
 
 //====================================================
 // HX711 腳位設定
@@ -140,6 +141,10 @@ const char* DEFAULT_WIFI_SSID = "thmrb306";
 const char* DEFAULT_WIFI_PASSWORD = "thmrbthmrb";
 String currentSSID = "";
 String currentPassword = "";
+String wifiProvisioningId = "";
+bool wifiProvisioningPending = false;
+unsigned long wifiProvisioningStartedAt = 0;
+const unsigned long WIFI_PROVISIONING_TIMEOUT_MS = 30000;
 
 const char* MQTT_SERVER = "mqttgo.io";
 const int MQTT_PORT = 1883;
@@ -231,6 +236,21 @@ void logPrint(String text) {
         mqttClient.publish(TOPIC_MSG, text.c_str(), true);
         mqttClient.publish(TOPIC_SERIAL_RAW, text.c_str(), true); 
     }
+}
+
+void sendProvisioningReply(String reply) {
+    if (bleDeviceConnected && txCharacteristic != nullptr) {
+        txCharacteristic->setValue(reply.c_str());
+        txCharacteristic->notify();
+    }
+}
+
+void finishProvisioningFailure(String reason) {
+    if (!wifiProvisioningPending) return;
+    sendProvisioningReply("E:" + wifiProvisioningId + ":" + reason);
+    wifiProvisioningPending = false;
+    wifiProvisioningId = "";
+    wifiConnecting = false;
 }
 
 //====================================================
@@ -638,7 +658,7 @@ void saveWiFiToNVS() {
 }
 
 void handleCommand(String input) {
-    input.trim();
+    if (!input.startsWith("WIFISET:")) input.trim();
     if(input.length() == 0) return;
 
     // 只將控制指令副本轉小寫；原始 input 保留給 SSID:密碼，
@@ -646,8 +666,62 @@ void handleCommand(String input) {
     String command = input;
     command.toLowerCase();
     
-    Serial.println("📨 [指令接收] " + input);
-    
+    if (input.startsWith("WIFISET:") || input.indexOf(':') > 0) {
+        Serial.println("📨 [WiFi] 收到網路設定（帳密已遮罩）");
+    } else {
+        Serial.println("📨 [指令接收] " + input);
+    }
+
+    if (input.startsWith("WIFISET:")) {
+        int idEnd = input.indexOf(':', 8);
+        int ssidEnd = idEnd < 0 ? -1 : input.indexOf(':', idEnd + 1);
+        if (idEnd < 0 || ssidEnd < 0) return;
+
+        String attemptId = input.substring(8, idEnd);
+        String ssid = input.substring(idEnd + 1, ssidEnd);
+        String password = input.substring(ssidEnd + 1);
+        bool validId = attemptId.length() == 12;
+        for (unsigned int i = 0; validId && i < attemptId.length(); i++) {
+            validId = isxdigit(attemptId[i]);
+        }
+        if (!validId) return;
+
+        if (ssid.length() == 0 || ssid.length() > 32 ||
+            password.length() > 63 ||
+            (password.length() > 0 && password.length() < 8) ||
+            ssid.indexOf('\n') >= 0 || ssid.indexOf('\r') >= 0 ||
+            password.indexOf('\n') >= 0 || password.indexOf('\r') >= 0) {
+            sendProvisioningReply("E:" + attemptId + ":BAD");
+            return;
+        }
+
+        wifiProvisioningPending = false;
+        wifiProvisioningId = attemptId;
+        currentSSID = ssid;
+        currentPassword = password;
+        saveWiFiToNVS();
+
+        if (mqttClient.connected()) {
+            mqttClient.disconnect();
+            delay(100);
+        }
+        WiFi.disconnect(true, true);
+        delay(300);
+        lastWiFiStatus = WL_DISCONNECTED;
+        wifiConnecting = false;
+        lastWiFiTryTime = 0;
+        if (currentPassword.length() == 0) {
+            WiFi.begin(currentSSID.c_str());
+        } else {
+            WiFi.begin(currentSSID.c_str(), currentPassword.c_str());
+        }
+        wifiConnecting = true;
+        wifiProvisioningPending = true;
+        wifiProvisioningStartedAt = millis();
+        Serial.println("📡 [WiFi] 已發起杯墊網路連線");
+        return;
+    }
+
     if(command == "tare")       { executeTare(); return; }
     if(command == "getweight")  { executeGetWeightOnce(); return; }
     if(command == "manualdrink" || command == "appmanual") { executeManualDrinkMode(); return; }
@@ -704,8 +778,12 @@ void handleSerialCommand() {
         char c = Serial.read();
         if(c == '\n' || c == '\r') {
             if(serialInput.length() > 0) {
-                Serial.print("📨 [Serial 接收] >>> ");
-                Serial.println(serialInput);
+                if (serialInput.startsWith("WIFISET:") || serialInput.indexOf(':') > 0) {
+                    Serial.println("📨 [Serial] 收到網路設定（帳密已遮罩）");
+                } else {
+                    Serial.print("📨 [Serial 接收] >>> ");
+                    Serial.println(serialInput);
+                }
                 handleCommand(serialInput);
                 serialInput = "";
             }
@@ -756,12 +834,23 @@ void connectWiFiNonBlocking() {
     if (currentStatus != lastWiFiStatus) {
         Serial.println("🌐 [WiFi 狀態變更] " + getWiFiStatusString(lastWiFiStatus) + " ➡️ " + getWiFiStatusString(currentStatus));
         if (currentStatus == WL_CONNECTED) {
+            if (wifiProvisioningPending) {
+                sendProvisioningReply("S:" + wifiProvisioningId);
+                wifiProvisioningPending = false;
+                wifiProvisioningId = "";
+            }
             appPrint("🎉 [WiFi 連線成功] IP: " + WiFi.localIP().toString());
             wifiConnecting = false;
-        } else if (currentStatus == WL_CONNECT_FAILED || currentStatus == WL_NO_SSID_AVAIL || currentStatus == WL_CONNECTION_LOST || currentStatus == WL_DISCONNECTED) {
+        } else if (currentStatus == WL_CONNECT_FAILED || currentStatus == WL_NO_SSID_AVAIL || currentStatus == WL_CONNECTION_LOST) {
+            finishProvisioningFailure(currentStatus == WL_NO_SSID_AVAIL ? "NOAP" : "AUTH");
             wifiConnecting = false;
         }
         lastWiFiStatus = currentStatus;
+    }
+
+    if (wifiProvisioningPending &&
+        millis() - wifiProvisioningStartedAt >= WIFI_PROVISIONING_TIMEOUT_MS) {
+        finishProvisioningFailure("TIME");
     }
     
     if(currentStatus == WL_CONNECTED) return;
@@ -898,12 +987,21 @@ void loop() {
 
     // BLE 資料處理
     if (bleRxBuffer.length() > 0) {
-        int colonIndex = bleRxBuffer.indexOf(':');
-        if (colonIndex >= 0 && (millis() - lastBleRxTime > 500)) {
-            handleCommand(bleRxBuffer);
-            bleRxBuffer = "";
-        }
-        else if (colonIndex == -1) {
+        if (bleRxBuffer.startsWith("WIFISET:")) {
+            int newlineIndex = bleRxBuffer.indexOf('\n');
+            if (newlineIndex >= 0) {
+                String packet = bleRxBuffer.substring(0, newlineIndex);
+                bleRxBuffer = bleRxBuffer.substring(newlineIndex + 1);
+                handleCommand(packet);
+            } else if (bleRxBuffer.length() > 128) {
+                bleRxBuffer = "";
+            }
+        } else {
+            int colonIndex = bleRxBuffer.indexOf(':');
+            if (colonIndex >= 0 && (millis() - lastBleRxTime > 500)) {
+                handleCommand(bleRxBuffer);
+                bleRxBuffer = "";
+            } else if (colonIndex == -1) {
             String lowerBuffer = bleRxBuffer; lowerBuffer.toLowerCase(); lowerBuffer.trim();
             if (lowerBuffer == "auto" || lowerBuffer == "forcecup" || lowerBuffer == "forcebox" || 
                 lowerBuffer == "resetauto" || lowerBuffer == "tare" || lowerBuffer == "clear" ||
@@ -913,8 +1011,9 @@ void loop() {
                 handleCommand(bleRxBuffer);
                 bleRxBuffer = "";
             }
+            }
         }
-        if (bleRxBuffer.length() > 64 || (millis() - lastBleRxTime > 5000)) bleRxBuffer = "";
+        if (bleRxBuffer.length() > 128 || (millis() - lastBleRxTime > 5000)) bleRxBuffer = "";
     }
 
     //====================================================

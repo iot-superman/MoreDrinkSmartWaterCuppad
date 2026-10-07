@@ -18,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -29,6 +28,8 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun ConnectSuccess(
+    deviceName: String,
+    ssid: String,
     onBackClick: () -> Unit = {}
 ) {
     // 漸進式動畫進場狀態
@@ -55,7 +56,7 @@ fun ConnectSuccess(
             verticalArrangement = Arrangement.Center // 關鍵：讓所有內容在螢幕垂直置中
         ) {
             // 預留些許空間避免緊貼 TopAppBar
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // 1. 連線成功標頭與動畫圖示 (螢幕核心置中焦點)
             AnimatedVisibility(
@@ -82,7 +83,7 @@ fun ConnectSuccess(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "設備已成功加入您的網路，並完成初始化設定。",
+                        text = "杯墊已確認連上 Wi-Fi，您現在可以返回設定頁。",
                         fontSize = 15.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -122,85 +123,23 @@ fun ConnectSuccess(
                         InfoRow(
                             iconText = "⚖️",
                             label = "設備名稱",
-                            valueText = "ESP32S3_SCALE"
+                            valueText = deviceName
                         )
 
-                        // Row 2: IP 地址 (帶淡灰色背景底)
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .padding(horizontal = 12.dp, vertical = 10.dp)
-                                    .fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Text("📡", fontSize = 16.sp)
-                                    Text(
-                                        text = "IP 地址",
-                                        fontSize = 15.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Text(
-                                    text = "192.168.1.105",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-
-                        // Row 3: MQTT 狀態
-                        Row(
-                            modifier = Modifier
-                                .padding(vertical = 4.dp)
-                                .fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text("☁️", fontSize = 16.sp)
-                                Text(
-                                    text = "MQTT 狀態",
-                                    fontSize = 15.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary)
-                                )
-                                Text(
-                                    text = "已連線",
-                                    fontSize = 15.sp,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
+                        InfoRow(iconText = "📶", label = "Wi-Fi 網路", valueText = ssid)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(
+                onClick = onBackClick,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("完成", fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -301,6 +240,6 @@ fun SuccessCheckAnimation(modifier: Modifier = Modifier) {
 @Composable
 fun ConnectSuccessPreview() {
     SmartCoasterTheme {
-        ConnectSuccess()
+        ConnectSuccess(deviceName = "ESP32S3_SCALE", ssid = "Wi-Fi")
     }
 }

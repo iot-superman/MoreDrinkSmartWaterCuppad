@@ -1,5 +1,6 @@
 package com.example.smartcoaster.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -41,6 +42,11 @@ fun SmartCoasterApp() {
     var selectedTab by remember { mutableIntStateOf(0) }
     var currentSubPage by remember { mutableStateOf("Main") }
     var settingSubPage by remember { mutableStateOf("SettingMain") }
+    var selectedBleAddress by remember { mutableStateOf<String?>(null) }
+    var selectedBleName by remember { mutableStateOf("ESP32S3_SCALE") }
+    var provisioningSsid by remember { mutableStateOf("") }
+    var navigateAfterBleReady by remember { mutableStateOf(false) }
+    var confirmedSsid by remember { mutableStateOf("") }
     var mqttStatus by remember { mutableStateOf("Initializing...") }
     var lastLog by remember { mutableStateOf("Ready") }
 
@@ -53,6 +59,8 @@ fun SmartCoasterApp() {
     val bleManager = remember { BleManager(context) }
     val bleConnectionState by bleManager.connectionState.collectAsState()
     val connectedDeviceName by bleManager.connectedDeviceName.collectAsState()
+    val connectedDeviceAddress by bleManager.connectedDeviceAddress.collectAsState()
+    val provisioningState by bleManager.provisioningState.collectAsState()
 
     // Tare Popup 狀態：只有收到 ESP32 的 Tare 開始訊息才顯示。
     // 收到 TARE_DONE 後先顯示 100% 約 0.5 秒，再自動消失。
@@ -89,8 +97,57 @@ fun SmartCoasterApp() {
         }
     }
 
+    LaunchedEffect(bleConnectionState, navigateAfterBleReady) {
+        if (navigateAfterBleReady && bleConnectionState == BleConnectionState.Connected) {
+            navigateAfterBleReady = false
+            settingSubPage = "Page1"
+        } else if (bleConnectionState is BleConnectionState.Error) {
+            navigateAfterBleReady = false
+        }
+    }
+
+    LaunchedEffect(provisioningState, settingSubPage) {
+        if (settingSubPage == "Page1" && provisioningState is WifiProvisioningState.Success) {
+            confirmedSsid = provisioningState.ssid
+            bleManager.connectedDeviceName.value?.let { selectedBleName = it }
+            settingSubPage = "ConnectSuccess"
+        }
+    }
+
     val showBackButton = (selectedTab == 0 && currentSubPage != "Main") ||
             (selectedTab == 3 && settingSubPage != "SettingMain")
+
+    val navigateBack = {
+        if (selectedTab == 0) {
+            currentSubPage = when (currentSubPage) {
+                "DrinkStep1" -> "Main"
+                "DrinkStep2" -> "DrinkStep1"
+                "DrinkStep3" -> "DrinkStep2"
+                else -> "Main"
+            }
+        } else if (selectedTab == 3) {
+            when (settingSubPage) {
+                "Page1" -> {
+                    bleManager.cancelProvisioning()
+                    settingSubPage = "FindDevice"
+                }
+                "FindDevice" -> {
+                    navigateAfterBleReady = false
+                    bleManager.cancelConnectionIfConnecting()
+                    settingSubPage = "SettingMain"
+                }
+                else -> settingSubPage = "SettingMain"
+            }
+        }
+    }
+    BackHandler(enabled = showBackButton) { navigateBack() }
+
+    DisposableEffect(bleManager) {
+        onDispose {
+            bleManager.cancelProvisioning()
+            bleManager.closeGatt()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -128,21 +185,7 @@ fun SmartCoasterApp() {
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             if (showBackButton) {
-                                IconButton(onClick = {
-                                    if (selectedTab == 0) {
-                                        currentSubPage = when (currentSubPage) {
-                                            "DrinkStep1" -> "Main"
-                                            "DrinkStep2" -> "DrinkStep1"
-                                            "DrinkStep3" -> "DrinkStep2"
-                                            else -> "Main"
-                                        }
-                                    } else if (selectedTab == 3) {
-                                        settingSubPage = when (settingSubPage) {
-                                            "Page1" -> "FindDevice"
-                                            else -> "SettingMain"
-                                        }
-                                    }
-                                }) {
+                                IconButton(onClick = navigateBack) {
                                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                                 }
                             } else {
@@ -174,14 +217,36 @@ fun SmartCoasterApp() {
         bottomBar = {
             NavigationBar {
                 NavItem(Icons.Default.LocalCafe, "喝水", 0, selectedTab) {
+                    if (selectedTab == 3) {
+                        navigateAfterBleReady = false
+                        bleManager.cancelProvisioning()
+                        bleManager.cancelConnectionIfConnecting()
+                    }
                     selectedTab = 0
                     if (currentSubPage != "Main") mqttManager.publish("legacyauto")
                     currentSubPage = "Main"
                 }
                 // 新增第 2 個 Tab：以原生 WebView 顯示附近飲水機地圖。
-                NavItem(Icons.Default.PinDrop, "找水喝", 1, selectedTab) { selectedTab = 1 }
-                NavItem(Icons.Default.History, "歷史記錄", 2, selectedTab) { selectedTab = 2 }
+                NavItem(Icons.Default.PinDrop, "找水喝", 1, selectedTab) {
+                    if (selectedTab == 3) {
+                        navigateAfterBleReady = false
+                        bleManager.cancelProvisioning()
+                        bleManager.cancelConnectionIfConnecting()
+                    }
+                    selectedTab = 1
+                }
+                NavItem(Icons.Default.History, "歷史記錄", 2, selectedTab) {
+                    if (selectedTab == 3) {
+                        navigateAfterBleReady = false
+                        bleManager.cancelProvisioning()
+                        bleManager.cancelConnectionIfConnecting()
+                    }
+                    selectedTab = 2
+                }
                 NavItem(Icons.Default.Settings, "設定", 3, selectedTab) {
+                    bleManager.cancelProvisioning()
+                    bleManager.cancelConnectionIfConnecting()
+                    navigateAfterBleReady = false
                     selectedTab = 3
                     settingSubPage = "SettingMain"
                 }
@@ -284,21 +349,41 @@ fun SmartCoasterApp() {
                     // 新版設定：Page9 的 Setting()，並串回已完成的設備流程
                     when (settingSubPage) {
                         "SettingMain" -> Setting(
-                            onNavigateToDeviceConnection = { settingSubPage = "FindDevice" },
+                            onNavigateToDeviceConnection = {
+                                bleManager.cancelProvisioning()
+                                settingSubPage = "FindDevice"
+                            },
                             onNavigateToDeviceSettings = { settingSubPage = "Page8" }
                         )
                         "FindDevice" -> Page3(
-                            onNavigateToNext = { macAddress, requiresPassword ->
-                                bleManager.connect(macAddress)
-                                settingSubPage = if (requiresPassword) "Page1" else "ConnectSuccess"
+                            connectionState = bleConnectionState,
+                            connectedDeviceAddress = connectedDeviceAddress,
+                            initialSelectedAddress = selectedBleAddress,
+                            onNavigateToNext = { device ->
+                                selectedBleAddress = device.address
+                                selectedBleName = device.name
+                                if (bleConnectionState == BleConnectionState.Connected &&
+                                    connectedDeviceAddress == device.address
+                                ) {
+                                    settingSubPage = "Page1"
+                                } else {
+                                    navigateAfterBleReady = true
+                                    bleManager.connect(device.address, device.name)
+                                }
                             },
-                            onBackClick = { settingSubPage = "SettingMain" }
+                            onBackClick = { navigateBack() }
                         )
                         "Page1" -> Page1(
-                            onNavigateToNext = { settingSubPage = "ConnectSuccess" },
-                            onBackClick = { settingSubPage = "FindDevice" }
+                            provisioningState = provisioningState,
+                            initialSsid = provisioningSsid,
+                            onSsidChanged = { provisioningSsid = it },
+                            onSubmit = { ssid, password, openNetwork ->
+                                bleManager.startProvisioning(ssid, password, openNetwork)
+                            }
                         )
                         "ConnectSuccess" -> ConnectSuccess(
+                            deviceName = selectedBleName,
+                            ssid = confirmedSsid,
                             onBackClick = { settingSubPage = "SettingMain" }
                         )
                         "Page8" -> Page8(

@@ -2,11 +2,8 @@ package com.example.smartcoaster.ui
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -28,47 +25,40 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartcoaster.ui.theme.SmartCoasterTheme
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.sin
 
 @Composable
 fun Page1(
-    onNavigateToNext: () -> Unit = {},
-    onBackClick: () -> Unit = {}
+    provisioningState: WifiProvisioningState = WifiProvisioningState.Idle,
+    initialSsid: String = "",
+    onSsidChanged: (String) -> Unit = {},
+    onSubmit: (ssid: String, password: String, openNetwork: Boolean) -> Unit = { _, _, _ -> }
 ) {
-    // 狀態管理
-    var ssid by remember { mutableStateOf("thmrb306") }
+    var ssid by remember { mutableStateOf(initialSsid) }
     var password by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
-
-    // 按鈕同步狀態: 0=未同步, 1=同步中, 2=同步完成
-    var syncStatus by remember { mutableIntStateOf(0) }
-    var isPasswordError by remember { mutableStateOf(false) }
-
-    val coroutineScope = rememberCoroutineScope()
+    var openNetwork by remember { mutableStateOf(false) }
+    var validationError by remember { mutableStateOf<String?>(null) }
+    val isSubmitting = provisioningState == WifiProvisioningState.Sending ||
+            provisioningState == WifiProvisioningState.Waiting
+    val provisioningError = (provisioningState as? WifiProvisioningState.Error)?.message
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 20.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 預留 88.dp 避開 SmartCoasterApp 的全域 TopAppBar
-            Spacer(modifier = Modifier.height(88.dp))
-
-            // 1. 頂部設備連線繪圖動畫 (Device & Coaster Canvas Animation)
             DeviceConnectionAnimation(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(130.dp)
+                    .height(110.dp)
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // 2. 標題與說明文字
             Text(
                 text = "網路設定",
                 fontSize = 24.sp,
@@ -79,15 +69,13 @@ fun Page1(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "請輸入 Wi-Fi 密碼，讓智能杯墊連上網路以同步數據。",
+                text = "請輸入杯墊要連線的 Wi-Fi 名稱與密碼。",
                 fontSize = 15.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 8.dp)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // 3. Wi-Fi SSID 卡片
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
@@ -95,111 +83,113 @@ fun Page1(
                 ),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = "Wi-Fi 網路 (SSID)",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.outline,
                         fontWeight = FontWeight.Medium
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                    OutlinedTextField(
+                        value = ssid,
+                        onValueChange = {
+                            ssid = it
+                            validationError = null
+                            onSsidChanged(it)
+                        },
+                        singleLine = true,
+                        placeholder = { Text("請輸入 Wi-Fi 名稱") },
+                        enabled = !isSubmitting,
                         modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("📶", fontSize = 20.sp)
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = ssid,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Normal,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        IconButton(onClick = { /* 更換 Wi-Fi 邏輯 */ }) {
-                            Text("⇄", fontSize = 20.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                        }
-                    }
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // 4. Wi-Fi 密碼輸入卡片
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                ),
-                border = if (isPasswordError) CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.error)) else null,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
+                Checkbox(
+                    checked = openNetwork,
+                    onCheckedChange = {
+                        openNetwork = it
+                        if (it) password = ""
+                        validationError = null
+                    },
+                    enabled = !isSubmitting
+                )
+                Text("這是開放式 Wi-Fi（無密碼）", fontSize = 14.sp)
+            }
+
+            if (!openNetwork) {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = "密碼",
-                        fontSize = 12.sp,
-                        color = if (isPasswordError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("🔒", fontSize = 18.sp)
-                        Spacer(modifier = Modifier.width(10.dp))
-                        TextField(
-                            value = password,
-                            onValueChange = {
-                                password = it
-                                if (it.isNotBlank()) isPasswordError = false
-                            },
-                            placeholder = {
-                                Text(
-                                    "請輸入 Wi-Fi 密碼",
-                                    color = MaterialTheme.colorScheme.outlineVariant,
-                                    fontSize = 16.sp
-                                )
-                            },
-                            visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                disabledContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent
-                            ),
-                            modifier = Modifier.weight(1f)
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "密碼",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.outline,
+                            fontWeight = FontWeight.Medium
                         )
-                        IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
-                            Text(
-                                text = if (isPasswordVisible) "👁️" else "🙈",
-                                fontSize = 18.sp
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("🔒", fontSize = 18.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            TextField(
+                                value = password,
+                                onValueChange = {
+                                    password = it
+                                    validationError = null
+                                },
+                                placeholder = { Text("8 至 63 個 UTF-8 位元組") },
+                                visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                                enabled = !isSubmitting,
+                                singleLine = true,
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    disabledContainerColor = Color.Transparent,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent
+                                ),
+                                modifier = Modifier.weight(1f)
                             )
+                            IconButton(
+                                onClick = { isPasswordVisible = !isPasswordVisible },
+                                enabled = !isSubmitting
+                            ) {
+                                Text(if (isPasswordVisible) "👁️" else "🙈", fontSize = 18.sp)
+                            }
                         }
                     }
                 }
             }
 
-            if (isPasswordError) {
+            validationError?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+            }
+            provisioningError?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+            }
+            if (provisioningState == WifiProvisioningState.Waiting) {
                 Text(
-                    text = "請輸入密碼以繼續",
-                    color = MaterialTheme.colorScheme.error,
-                    fontSize = 12.sp,
-                    modifier = Modifier
-                        .align(Alignment.Start)
-                        .padding(start = 8.dp, top = 4.dp)
+                    "等待杯墊確認 Wi-Fi 連線…",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(100.dp)) // 留白避免被底部按鈕遮擋
+            Spacer(modifier = Modifier.height(88.dp))
         }
 
         // 5. 底部固定動作按鈕
@@ -217,24 +207,19 @@ fun Page1(
             ) {
                 Button(
                     onClick = {
-                        if (password.isBlank()) {
-                            isPasswordError = true
+                        val error = WifiProvisioningProtocol.validate(ssid, password, openNetwork)
+                        if (error != null) {
+                            validationError = error
                         } else {
-                            isPasswordError = false
-                            coroutineScope.launch {
-                                syncStatus = 1 // 進入同步中
-                                delay(2500)
-                                syncStatus = 2 // 完成同步
-                                delay(800)     // 停頓 0.8 秒展示完成圖示
-                                onNavigateToNext() // 自動跳轉至下一頁
-                            }
+                            validationError = null
+                            onSubmit(ssid, password, openNetwork)
                         }
                     },
-                    enabled = syncStatus != 1,
+                    enabled = !isSubmitting,
                     shape = RoundedCornerShape(28.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (syncStatus == 2) Color(0xFFD7E5ED) else MaterialTheme.colorScheme.primary,
-                        contentColor = if (syncStatus == 2) Color(0xFF101D23) else MaterialTheme.colorScheme.onPrimary
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -245,26 +230,18 @@ fun Page1(
                         horizontalArrangement = Arrangement.Center,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        when (syncStatus) {
-                            0 -> {
-                                Text("同步至設備", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("➔", fontSize = 18.sp)
-                            }
-                            1 -> {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    strokeWidth = 2.dp
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text("同步中...", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                            }
-                            2 -> {
-                                Text("✔", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("設定完成", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                            }
+                        if (isSubmitting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("同步中…", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        } else {
+                            Text("同步至設備", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("➔", fontSize = 18.sp)
                         }
                     }
                 }
@@ -371,6 +348,6 @@ fun DeviceConnectionAnimation(modifier: Modifier = Modifier) {
 @Composable
 fun Page1Preview() {
     SmartCoasterTheme {
-        Page1(onNavigateToNext = {})
+        Page1()
     }
 }

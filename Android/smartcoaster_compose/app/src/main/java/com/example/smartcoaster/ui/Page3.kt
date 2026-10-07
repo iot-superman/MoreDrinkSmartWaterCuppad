@@ -1,15 +1,21 @@
 package com.example.smartcoaster.ui
 
 import android.Manifest
+import android.app.Activity
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
@@ -34,19 +40,22 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.app.ActivityCompat
 import com.example.smartcoaster.ui.theme.SmartCoasterTheme
 
 data class BleDeviceItem(
     val name: String,
     val address: String,
-    val rssi: Int = 0,
-    val requiresPassword: Boolean = false
+    val rssi: Int = 0
 )
 
 @SuppressLint("MissingPermission")
 @Composable
 fun Page3(
-    onNavigateToNext: (macAddress: String, requiresPassword: Boolean) -> Unit = { _, _ -> },
+    connectionState: BleConnectionState = BleConnectionState.Disconnected,
+    connectedDeviceAddress: String? = null,
+    initialSelectedAddress: String? = null,
+    onNavigateToNext: (device: BleDeviceItem) -> Unit = {},
     onBackClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -54,15 +63,23 @@ fun Page3(
     val bluetoothAdapter = remember { bluetoothManager?.adapter }
 
     var discoveredDevices by remember { mutableStateOf<List<BleDeviceItem>>(emptyList()) }
-    var selectedDevice by remember { mutableStateOf<BleDeviceItem?>(null) }
+    var selectedDevice by remember(initialSelectedAddress) {
+        mutableStateOf(discoveredDevices.firstOrNull { it.address == initialSelectedAddress })
+    }
     var hasPermission by remember { mutableStateOf(false) }
+    var bluetoothEnabled by remember { mutableStateOf(false) }
+    var scanAttempt by remember { mutableIntStateOf(0) }
+    var isScanning by remember { mutableStateOf(false) }
+    var scanError by remember { mutableStateOf<String?>(null) }
+    var stopActiveScan by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var permissionRequested by remember { mutableStateOf(false) }
+    var permissionSettingsRequired by remember { mutableStateOf(false) }
 
     val requiredPermissions = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             arrayOf(
                 Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_CONNECT,
-                Manifest.permission.ACCESS_FINE_LOCATION
+                Manifest.permission.BLUETOOTH_CONNECT
             )
         } else {
             arrayOf(
@@ -75,6 +92,40 @@ fun Page3(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         hasPermission = permissions.values.all { it }
+        permissionSettingsRequired = !hasPermission && permissionRequested &&
+                (context as? Activity)?.let { activity ->
+                    requiredPermissions.any {
+                        ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED &&
+                                !ActivityCompat.shouldShowRequestPermissionRationale(activity, it)
+                    }
+                } == true
+        if (!hasPermission) {
+            scanError = if (permissionSettingsRequired) {
+                "藍牙權限已停用，請至系統設定允許"
+            } else {
+                "未授予藍牙權限，請允許後重新搜尋"
+            }
+        }
+    }
+
+    DisposableEffect(context) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
+                    bluetoothEnabled = intent.getIntExtra(
+                        BluetoothAdapter.EXTRA_STATE,
+                        BluetoothAdapter.ERROR
+                    ) == BluetoothAdapter.STATE_ON
+                }
+            }
+        }
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        onDispose { context.unregisterReceiver(receiver) }
     }
 
     LaunchedEffect(Unit) {
@@ -84,49 +135,104 @@ fun Page3(
         if (allGranted) {
             hasPermission = true
         } else {
+            permissionRequested = true
             permissionLauncher.launch(requiredPermissions)
         }
     }
 
-    DisposableEffect(hasPermission) {
-        if (!hasPermission || bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
+    LaunchedEffect(hasPermission) {
+        bluetoothEnabled = if (hasPermission) {
+            runCatching { bluetoothAdapter?.isEnabled == true }.getOrDefault(false)
+        } else {
+            false
+        }
+    }
+
+    DisposableEffect(hasPermission, bluetoothEnabled, scanAttempt) {
+        if (!hasPermission || bluetoothAdapter == null || !bluetoothEnabled) {
+            isScanning = false
+            stopActiveScan = null
+            if (hasPermission && !bluetoothEnabled) scanError = "請開啟藍牙後重新搜尋"
             onDispose { }
         } else {
-            val scanner = bluetoothAdapter.bluetoothLeScanner
-            val settings = ScanSettings.Builder()
-                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-                .build()
+            val scanner = runCatching { bluetoothAdapter.bluetoothLeScanner }.getOrNull()
+            if (scanner == null) {
+                scanError = "無法啟動藍牙掃描，請確認權限與藍牙狀態"
+                onDispose { }
+            } else {
+                val settings = ScanSettings.Builder()
+                    .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                    .build()
 
-            val scanCallback = object : ScanCallback() {
-                override fun onScanResult(callbackType: Int, result: ScanResult?) {
-                    result?.let { scanResult ->
-                        val device = scanResult.device
-                        val address = device.address
+                val scanCallback = object : ScanCallback() {
+                    override fun onScanResult(callbackType: Int, result: ScanResult?) {
+                        result?.let { scanResult ->
+                            try {
+                                val device = scanResult.device
+                                val address = device.address
+                                val recordName = scanResult.scanRecord?.deviceName
+                                val rawName = recordName ?: device.name
+                                val finalName = if (!rawName.isNullOrBlank()) {
+                                    rawName
+                                } else {
+                                    "未命名裝置 (${address.takeLast(5)})"
+                                }
+                                val newItem = BleDeviceItem(name = finalName, address = address, rssi = scanResult.rssi)
 
-                        val recordName = scanResult.scanRecord?.deviceName
-                        val rawName = recordName ?: device.name
-                        val finalName = if (!rawName.isNullOrBlank()) rawName else "未命名裝置 (${address.takeLast(5)})"
-                        val rssi = scanResult.rssi
-
-                        val needPass = finalName.contains("LOCK", ignoreCase = true)
-                        val newItem = BleDeviceItem(name = finalName, address = address, rssi = rssi, requiresPassword = needPass)
-
-                        discoveredDevices = discoveredDevices.toMutableList().apply {
-                            val index = indexOfFirst { it.address == address }
-                            if (index != -1) {
-                                this[index] = newItem
-                            } else {
-                                add(newItem)
+                                discoveredDevices = discoveredDevices.toMutableList().apply {
+                                    val index = indexOfFirst { it.address == address }
+                                    if (index != -1) this[index] = newItem else add(newItem)
+                                }.sortedByDescending { !it.name.startsWith("未命名") }
+                                if (address == initialSelectedAddress) selectedDevice = newItem
+                            } catch (_: SecurityException) {
+                                scanError = "藍牙權限已變更，請重新授予"
+                                stopActiveScan?.invoke()
                             }
-                        }.sortedByDescending { !it.name.startsWith("未命名") }
+                        }
+                    }
+
+                    override fun onScanFailed(errorCode: Int) {
+                        isScanning = false
+                        scanError = "藍牙搜尋失敗（$errorCode），請重新搜尋"
                     }
                 }
+
+                try {
+                    scanner.startScan(null, settings, scanCallback)
+                    isScanning = true
+                    scanError = null
+                    val stop = {
+                        runCatching { scanner.stopScan(scanCallback) }
+                        isScanning = false
+                        Unit
+                    }
+                    stopActiveScan = stop
+                } catch (_: SecurityException) {
+                    isScanning = false
+                    scanError = "缺少藍牙搜尋權限，請重新授予"
+                } catch (_: IllegalStateException) {
+                    isScanning = false
+                    scanError = "藍牙搜尋無法啟動，請稍後重試"
+                } catch (_: IllegalArgumentException) {
+                    isScanning = false
+                    scanError = "藍牙掃描參數無效，請重新搜尋"
+                }
+
+                onDispose {
+                    runCatching { scanner.stopScan(scanCallback) }
+                    isScanning = false
+                    stopActiveScan = null
+                }
             }
+        }
+    }
 
-            scanner?.startScan(null, settings, scanCallback)
-
-            onDispose {
-                scanner?.stopScan(scanCallback)
+    LaunchedEffect(scanAttempt, isScanning) {
+        if (isScanning) {
+            kotlinx.coroutines.delay(15_000)
+            if (isScanning) {
+                stopActiveScan?.invoke()
+                scanError = "搜尋已逾時，請重新搜尋"
             }
         }
     }
@@ -138,8 +244,6 @@ fun Page3(
                 .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(72.dp))
-
             Text(
                 text = "尋找設備",
                 fontSize = 22.sp,
@@ -150,7 +254,11 @@ fun Page3(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = if (hasPermission) "請將智慧水壺底座靠近您的手機" else "請授予藍牙與定位權限以搜尋裝置",
+                text = when {
+                    !hasPermission -> "請授予藍牙權限以搜尋裝置"
+                    !bluetoothEnabled -> "請開啟藍牙並將杯墊靠近手機"
+                    else -> "請將智慧水壺底座靠近您的手機"
+                },
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -177,6 +285,56 @@ fun Page3(
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.padding(start = 4.dp)
                 )
+                TextButton(
+                    onClick = {
+                        when {
+                            !hasPermission && permissionSettingsRequired -> runCatching {
+                                context.startActivity(
+                                    Intent(
+                                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        Uri.parse("package:${context.packageName}")
+                                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                )
+                            }
+                            !hasPermission -> {
+                                permissionRequested = true
+                                permissionLauncher.launch(requiredPermissions)
+                            }
+                            !bluetoothEnabled -> runCatching {
+                                context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                            }
+                            else -> {
+                                discoveredDevices = emptyList()
+                                selectedDevice = null
+                                scanError = null
+                                scanAttempt++
+                            }
+                        }
+                    },
+                    enabled = !isScanning
+                ) {
+                    Text(
+                        when {
+                            isScanning -> "搜尋中…"
+                            !hasPermission -> "授予權限"
+                            !bluetoothEnabled -> "開啟藍牙"
+                            else -> "重新搜尋"
+                        }
+                    )
+                }
+            }
+
+            scanError?.let { error ->
+                Text(error, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+            }
+            if (connectionState is BleConnectionState.Error) {
+                Text(
+                    connectionState.message,
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 13.sp
+                )
+            } else if (connectionState == BleConnectionState.Connecting) {
+                Text("正在連接並確認設備服務…", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -191,7 +349,6 @@ fun Page3(
                 items(discoveredDevices, key = { it.address }) { device ->
                     val isSelected = selectedDevice?.address == device.address
                     val isNamed = !device.name.startsWith("未命名")
-
                     Card(
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(
@@ -276,10 +433,11 @@ fun Page3(
                 Button(
                     onClick = {
                         selectedDevice?.let { device ->
-                            onNavigateToNext(device.address, device.requiresPassword)
+                            stopActiveScan?.invoke()
+                            onNavigateToNext(device)
                         }
                     },
-                    enabled = selectedDevice != null,
+                    enabled = selectedDevice != null && connectionState != BleConnectionState.Connecting,
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -293,8 +451,10 @@ fun Page3(
                 ) {
                     val btnText = when {
                         selectedDevice == null -> "請選擇裝置"
-                        selectedDevice?.requiresPassword == true -> "連接此藍牙裝置"
-                        else -> "開始藍牙連線"
+                        connectionState == BleConnectionState.Connecting -> "連線中…"
+                        connectionState == BleConnectionState.Connected &&
+                                connectedDeviceAddress == selectedDevice?.address -> "繼續設定"
+                        else -> "連接此藍牙裝置"
                     }
                     Text(
                         text = btnText,
