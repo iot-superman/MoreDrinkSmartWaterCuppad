@@ -661,11 +661,6 @@ void handleCommand(String input) {
     if (!input.startsWith("WIFISET:")) input.trim();
     if(input.length() == 0) return;
 
-    // 只將控制指令副本轉小寫；原始 input 保留給 SSID:密碼，
-    // 避免 Wi-Fi 名稱或密碼的英文大小寫遭到破壞。
-    String command = input;
-    command.toLowerCase();
-    
     if (input.startsWith("WIFISET:") || input.indexOf(':') > 0) {
         Serial.println("📨 [WiFi] 收到網路設定（帳密已遮罩）");
     } else {
@@ -721,6 +716,10 @@ void handleCommand(String input) {
         Serial.println("📡 [WiFi] 已發起杯墊網路連線");
         return;
     }
+
+    // 只將控制指令副本轉小寫；原始 input 保留給 SSID:密碼。
+    String command = input;
+    command.toLowerCase();
 
     if(command == "tare")       { executeTare(); return; }
     if(command == "getweight")  { executeGetWeightOnce(); return; }
