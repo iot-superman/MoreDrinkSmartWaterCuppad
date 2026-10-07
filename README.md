@@ -33,6 +33,8 @@ MTU 23, credentials are split into sequential acknowledged writes; no newline
 is added. If a write takes 400 ms or more, Android aborts before sending another
 chunk, because firmware processes accumulated credentials after 500 ms of silence.
 Such an abort may leave partial credentials on the device; reconnect and resend.
+SSID prefixes that become firmware control commands (such as `tare` followed
+by spaces) at a chunk boundary are rejected before writing anything.
 
 Hardware acceptance checks:
 

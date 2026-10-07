@@ -12,6 +12,7 @@ internal class LegacyWifiProvisioning(
     private var credentialsSaved = false
 
     init {
+        require(notificationLimit >= 20) { "BLE MTU 無效" }
         require(ssid.isNotBlank() && ssid.toByteArray(Charsets.UTF_8).size <= 32) {
             "SSID 必須為 1–32 bytes"
         }
@@ -22,6 +23,11 @@ internal class LegacyWifiProvisioning(
         // Empty passwords are passed directly to WiFi.begin() by dev.
         payload = "$ssid:$password".toByteArray(Charsets.UTF_8)
         require(payload.size <= 64) { "舊版韌體的 Wi-Fi 帳密合計不可超過 64 bytes" }
+        // Colon-free chunks are immediately checked as control commands by dev.
+        for (end in notificationLimit until payload.size step notificationLimit) {
+            val prefix = String(payload.copyOfRange(0, end), Charsets.UTF_8).trim().lowercase()
+            require(prefix !in controlCommands) { "舊版韌體無法安全分段傳送此 SSID" }
+        }
     }
 
     fun receive(value: ByteArray): Result? {
@@ -45,5 +51,12 @@ internal class LegacyWifiProvisioning(
         val ip = Regex("🎉 \\[WiFi 連線成功] IP: (\\d{1,3}(?:\\.\\d{1,3}){3})")
             .matchEntire(notification)?.groupValues?.get(1) ?: return null
         return if (ip.split('.').all { it.toInt() in 0..255 }) Result(ip) else null
+    }
+
+    private companion object {
+        val controlCommands = setOf(
+            "auto", "forcecup", "forcebox", "resetauto", "tare", "clear", "getweight",
+            "manualdrink", "appmanual", "legacyauto", "streamon", "streamoff", "unlock", "reset"
+        )
     }
 }
