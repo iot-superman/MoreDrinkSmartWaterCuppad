@@ -53,6 +53,10 @@ fun SmartCoasterApp() {
     val bleManager = remember { BleManager(context) }
     val bleConnectionState by bleManager.connectionState.collectAsState()
     val connectedDeviceName by bleManager.connectedDeviceName.collectAsState()
+    val provisioningState by bleManager.provisioningState.collectAsState()
+    DisposableEffect(bleManager) {
+        onDispose { bleManager.disconnect() }
+    }
 
     // Tare Popup 狀態：只有收到 ESP32 的 Tare 開始訊息才顯示。
     // 收到 TARE_DONE 後先顯示 100% 約 0.5 秒，再自動消失。
@@ -288,17 +292,22 @@ fun SmartCoasterApp() {
                             onNavigateToDeviceSettings = { settingSubPage = "Page8" }
                         )
                         "FindDevice" -> Page3(
-                            onNavigateToNext = { macAddress, requiresPassword ->
-                                bleManager.connect(macAddress)
-                                settingSubPage = if (requiresPassword) "Page1" else "ConnectSuccess"
+                            bleManager = bleManager,
+                            onNavigateToNext = { _, _ ->
+                                // BLE device names do not describe Wi-Fi security.
+                                settingSubPage = "Page1"
                             },
                             onBackClick = { settingSubPage = "SettingMain" }
                         )
                         "Page1" -> Page1(
+                            bleManager = bleManager,
                             onNavigateToNext = { settingSubPage = "ConnectSuccess" },
                             onBackClick = { settingSubPage = "FindDevice" }
                         )
                         "ConnectSuccess" -> ConnectSuccess(
+                            deviceName = connectedDeviceName ?: "未知設備",
+                            ssid = (provisioningState as? WifiProvisioningState.Success)?.ssid ?: "",
+                            ip = (provisioningState as? WifiProvisioningState.Success)?.ip ?: "未提供",
                             onBackClick = { settingSubPage = "SettingMain" }
                         )
                         "Page8" -> Page8(

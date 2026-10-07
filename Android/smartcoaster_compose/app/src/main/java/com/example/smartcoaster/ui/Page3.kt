@@ -47,7 +47,8 @@ data class BleDeviceItem(
 @Composable
 fun Page3(
     onNavigateToNext: (macAddress: String, requiresPassword: Boolean) -> Unit = { _, _ -> },
-    onBackClick: () -> Unit = {}
+    onBackClick: () -> Unit = {},
+    bleManager: BleManager? = null
 ) {
     val context = LocalContext.current
     val bluetoothManager = remember { context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager }
@@ -56,6 +57,24 @@ fun Page3(
     var discoveredDevices by remember { mutableStateOf<List<BleDeviceItem>>(emptyList()) }
     var selectedDevice by remember { mutableStateOf<BleDeviceItem?>(null) }
     var hasPermission by remember { mutableStateOf(false) }
+    var pendingDevice by remember { mutableStateOf<BleDeviceItem?>(null) }
+    val connectionState = bleManager?.connectionState?.collectAsState()?.value
+        ?: BleConnectionState.Disconnected
+
+    LaunchedEffect(connectionState, pendingDevice) {
+        val device = pendingDevice ?: return@LaunchedEffect
+        if (connectionState == BleConnectionState.Connected) {
+            pendingDevice = null
+            onNavigateToNext(device.address, device.requiresPassword)
+        }
+    }
+    DisposableEffect(bleManager) {
+        onDispose {
+            if (bleManager?.connectionState?.value == BleConnectionState.Connecting) {
+                bleManager.disconnect()
+            }
+        }
+    }
 
     val requiredPermissions = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -150,7 +169,11 @@ fun Page3(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = if (hasPermission) "請將智慧水壺底座靠近您的手機" else "請授予藍牙與定位權限以搜尋裝置",
+                text = when (connectionState) {
+                    is BleConnectionState.Error -> connectionState.message
+                    BleConnectionState.Connecting -> "正在連線及訂閱設備通知..."
+                    else -> if (hasPermission) "請將智慧水壺底座靠近您的手機" else "請授予藍牙與定位權限以搜尋裝置"
+                },
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -202,7 +225,8 @@ fun Page3(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
-                            .clickable {
+                            .clickable(enabled = connectionState != BleConnectionState.Connecting) {
+                                pendingDevice = null
                                 selectedDevice = if (isSelected) null else device
                             }
                     ) {
@@ -276,10 +300,12 @@ fun Page3(
                 Button(
                     onClick = {
                         selectedDevice?.let { device ->
-                            onNavigateToNext(device.address, device.requiresPassword)
+                            pendingDevice = device
+                            bleManager?.connect(device.address)
                         }
                     },
-                    enabled = selectedDevice != null,
+                    enabled = selectedDevice != null && hasPermission && bleManager != null &&
+                        connectionState != BleConnectionState.Connecting,
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
