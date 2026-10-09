@@ -16,6 +16,8 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+        // 從 ~/.gradle/gradle.properties 讀取金鑰，避免提交私人 API Key。
+        resValue("string", "google_maps_key", providers.gradleProperty("MAPS_API_KEY").orElse("YOUR_GOOGLE_MAPS_API_KEY").get())
     }
 
     buildFeatures { compose = true }
