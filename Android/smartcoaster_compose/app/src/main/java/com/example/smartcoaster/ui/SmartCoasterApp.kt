@@ -98,7 +98,7 @@ fun SmartCoasterApp() {
 
     Scaffold(
         topBar = {
-            // 「找水喝」使用滿版 WebView，因此第 2 個 Tab 不顯示 App 標題列與 MQTT 狀態列。
+            // 「找水喝」使用原生 Google Maps，因此第 2 個 Tab 不顯示 App 標題列與 MQTT 狀態列。
             // 其他頁面維持原本的頂部介面，不影響既有飲水流程。
             if (selectedTab != 1) {
                 Column {
@@ -182,7 +182,7 @@ fun SmartCoasterApp() {
                     if (currentSubPage != "Main") mqttManager.publish("legacyauto")
                     currentSubPage = "Main"
                 }
-                // 新增第 2 個 Tab：以原生 WebView 顯示附近飲水機地圖。
+                // 新增第 2 個 Tab：以 Android 原生 Google Maps SDK 顯示附近飲水機地圖。
                 NavItem(Icons.Default.PinDrop, "找水喝", 1, selectedTab) { selectedTab = 1 }
                 NavItem(Icons.Default.History, "歷史記錄", 2, selectedTab) { selectedTab = 2 }
                 NavItem(Icons.Default.Settings, "設定", 3, selectedTab) {
@@ -267,7 +267,7 @@ fun SmartCoasterApp() {
                         )
                     }
                 }
-                1 -> WaterMapScreen(
+                1 -> NativeGoogleWaterMapScreen(
                     forceFreshSearch = forceFreshMapSearch,
                     onForceFreshSearchConsumed = {
                         // 同一次 App 開啟期間切換 Tab 時，不再重複強制定位與搜尋。
