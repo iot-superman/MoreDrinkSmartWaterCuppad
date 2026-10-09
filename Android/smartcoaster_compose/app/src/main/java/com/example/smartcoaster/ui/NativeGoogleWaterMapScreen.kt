@@ -8,6 +8,15 @@ import android.os.Bundle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.animation.core.*
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -117,26 +126,25 @@ fun NativeGoogleWaterMapScreen(
     var firstTime by remember { mutableStateOf(true) }
     var generation by remember { mutableIntStateOf(0) }
     var listVisible by remember { mutableStateOf(false) }
+    var searchCenterScreen by remember { mutableStateOf<android.graphics.Point?>(null) }
     var addressSuggestions by remember { mutableStateOf<List<Pair<String, LatLng>>>(emptyList()) }
 
     fun drawMarkers() {
         val map = googleMap ?: return
         map.clear()
         map.addMarker(MarkerOptions().position(center).title("搜尋中心：可拖曳")
-            .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)).draggable(true))
+            .icon(WaterDropMarkerFactory.searchCenter()).anchor(0.5f, 0.5f).draggable(true))
         map.addCircle(CircleOptions().center(center).radius(radius.toDouble())
             .strokeColor(android.graphics.Color.BLUE).fillColor(0x0F1685E5))
         places.forEachIndexed { index, place ->
-            val hue = when (place.kind) {
-                "熱水", "溫水" -> BitmapDescriptorFactory.HUE_RED
-                "冰溫" -> BitmapDescriptorFactory.HUE_ORANGE
-                else -> if (place.source == "online") BitmapDescriptorFactory.HUE_GREEN else BitmapDescriptorFactory.HUE_CYAN
-            }
+            // V2 水滴大頭針依飲水類別變色，保留編號與線上 NEW 標記。
             map.addMarker(MarkerOptions().position(place.pos)
                 .title((index + 1).toString() + ". " + place.name)
                 .snippet(place.kind + "｜" + place.meters + " 公尺｜" + place.detail)
-                .icon(BitmapDescriptorFactory.defaultMarker(hue)))?.tag = place
+                .icon(WaterDropMarkerFactory.create(index + 1, place.kind, place.source == "online", chosen?.key == place.key))
+                .anchor(0.5f, 1.0f))?.tag = place
         }
+        searchCenterScreen = map.projection.toScreenLocation(center)
     }
     fun moveCenter(point: LatLng) {
         center = point
@@ -165,7 +173,7 @@ fun NativeGoogleWaterMapScreen(
                 local.forEach { merged[it.key] = it }
                 online.forEach { if (!merged.containsKey(it.key)) merged[it.key] = it }
                 places = merged.values.sortedBy { it.meters }
-                status = "內建 " + local.size + "＋線上新增 " + (merged.size - local.size) + "＝" + merged.size + " 點"
+                status = "Hybrid 完成｜本地 " + local.size + "＋線上新增 " + (merged.size - local.size) + "＝" + merged.size + " 點"
             } catch (e: Exception) {
                 if (token != generation) return@launch
                 status = "線上資料暫時無法取得，仍保留本地 " + local.size + " 點"
@@ -247,12 +255,12 @@ fun NativeGoogleWaterMapScreen(
     LaunchedEffect(center, radius, places, googleMap) { drawMarkers() }
 
     Column(Modifier.fillMaxSize()) {
-        Surface(shadowElevation = 4.dp) {
+        Surface(shadowElevation = 6.dp, shape = RoundedCornerShape(18.dp), modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
             Column(Modifier.fillMaxWidth().padding(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(address, { address = it }, label = { Text("輸入地址") },
                         singleLine = true, modifier = Modifier.weight(1f))
-                    Button(onClick = { geocode() }) { Text("找地址") }
+                    OutlinedButton(onClick = { geocode() }) { Text("找地址") }
                 }
                 if (addressSuggestions.isNotEmpty()) {
                     androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 145.dp)) {
@@ -269,7 +277,7 @@ fun NativeGoogleWaterMapScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     var expanded by remember { mutableStateOf(false) }
                     Box {
-                        TextButton(onClick = { expanded = true }) { Text((radius / 1000f).toString() + " 公里") }
+                        TextButton(onClick = { expanded = true }) { Text(if (radius < 1000) "$radius 公尺" else "${radius / 1000} 公里") }
                         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                             listOf(500, 1000, 2000, 5000, 10000).forEach { r ->
                                 DropdownMenuItem(text = { Text(r.toString() + " 公尺") }, onClick = {
@@ -279,18 +287,18 @@ fun NativeGoogleWaterMapScreen(
                             }
                         }
                     }
-                    TextButton(onClick = { locate() }) { Text("GPS") }
+                    TextButton(onClick = { locate() }) { Text("我的位置") }
                     TextButton(onClick = { googleMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(center, 15f)) }) {
-                        Text("重整")
+                        Text("重新整理")
                     }
-                    Button(onClick = {
+                    Button(colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF129F92)), onClick = {
                         if (searching) { generation++; searching = false; status = "搜尋已取消" }
                         else searchWater()
-                    }) { Text(if (searching) "取消" else "搜尋") }
+                    }) { Text(if (searching) "取消搜尋" else "搜尋飲水點") }
                 }
-                Text(status, style = MaterialTheme.typography.bodySmall)
+                Text(status, style = MaterialTheme.typography.bodySmall, color = Color(0xFF355C58))
                 TextButton(onClick = { listVisible = !listVisible }) {
-                    Text("飲水點 " + places.size + " 個｜" + if (listVisible) "收合列表" else "顯示列表")
+                    Text("💧 飲水點 " + places.size + " 個｜" + if (listVisible) "收合列表" else "顯示列表")
                 }
             }
         }
@@ -312,11 +320,45 @@ fun NativeGoogleWaterMapScreen(
                         })
                         map.setOnMarkerClickListener {
                             chosen = it.tag as? WaterPlace
+                            drawMarkers()
                             false
                         }
                     }
                 }
             })
+            // 雷達為疊在原生 MapView 上方的 Compose 動畫層；僅搜尋期間顯示。
+            if (searching) {
+                val transition = rememberInfiniteTransition(label = "waterRadar")
+                val pulse by transition.animateFloat(
+                    initialValue = 0.15f, targetValue = 1f,
+                    animationSpec = infiniteRepeatable(tween(1700, easing = LinearEasing)),
+                    label = "radarPulse"
+                )
+                val rotation by transition.animateFloat(
+                    initialValue = 0f, targetValue = 360f,
+                    animationSpec = infiniteRepeatable(tween(2800, easing = LinearEasing)),
+                    label = "radarSweep"
+                )
+                Canvas(Modifier.fillMaxSize()) {
+                    // 確保雷達中心與目前搜尋座標的螢幕位置一致。
+                    val point = searchCenterScreen
+                    val radarCenter = if (point != null) androidx.compose.ui.geometry.Offset(point.x.toFloat(), point.y.toFloat())
+                        else androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+                    val maxRadius = 125.dp.toPx()
+                    drawCircle(Color(0xFF129F92).copy(alpha = (1f - pulse) * 0.35f),
+                        radius = maxRadius * pulse, center = radarCenter, style = Stroke(width = 3.dp.toPx()))
+                    drawCircle(Color(0xFF129F92).copy(alpha = 0.22f),
+                        radius = maxRadius * ((pulse + 0.42f) % 1f), center = radarCenter,
+                        style = Stroke(width = 2.dp.toPx()))
+                    val rad = Math.toRadians(rotation.toDouble())
+                    val endPoint = radarCenter + androidx.compose.ui.geometry.Offset(
+                        kotlin.math.cos(rad).toFloat() * maxRadius,
+                        kotlin.math.sin(rad).toFloat() * maxRadius
+                    )
+                    drawLine(Color(0xFF129F92).copy(alpha = 0.65f), radarCenter,
+                        endPoint, strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
+                }
+            }
             if (listVisible) {
                 Surface(Modifier.fillMaxWidth().fillMaxHeight(0.6f).align(Alignment.BottomCenter),
                     shadowElevation = 10.dp) {
