@@ -117,6 +117,7 @@ fun NativeGoogleWaterMapScreen(
     var firstTime by remember { mutableStateOf(true) }
     var generation by remember { mutableIntStateOf(0) }
     var listVisible by remember { mutableStateOf(false) }
+    var addressSuggestions by remember { mutableStateOf<List<Pair<String, LatLng>>>(emptyList()) }
 
     fun drawMarkers() {
         val map = googleMap ?: return
@@ -202,33 +203,33 @@ fun NativeGoogleWaterMapScreen(
         else gpsPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
     }
     fun geocode() {
-        if (address.isBlank()) { status = "請輸入地址"; return }
+        if (address.trim().length < 2) { status = "請輸入至少兩個字的地址"; return }
         scope.launch {
             try {
                 val found = withContext(Dispatchers.IO) {
-                    val url = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=tw&q=" +
-                        URLEncoder.encode(address, "UTF-8")
+                    val url = "https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&countrycodes=tw&q=" +
+                        URLEncoder.encode(address.trim(), "UTF-8")
                     val conn = URL(url).openConnection() as HttpURLConnection
                     try {
                         conn.setRequestProperty("User-Agent", "SmartCoaster/1.0 Android")
                         conn.connectTimeout = 12000
                         conn.readTimeout = 12000
-                        JSONArray(conn.inputStream.bufferedReader().use { it.readText() })
+                        val result = JSONArray(conn.inputStream.bufferedReader().use { it.readText() })
+                        buildList {
+                            for (i in 0 until result.length()) {
+                                val item = result.getJSONObject(i)
+                                add(item.optString("display_name") to LatLng(item.getDouble("lat"), item.getDouble("lon")))
+                            }
+                        }
                     } finally { conn.disconnect() }
                 }
-                if (found.length() == 0) status = "查無符合的地址"
-                else {
-                    val point = found.getJSONObject(0)
-                    moveCenter(LatLng(point.getDouble("lat"), point.getDouble("lon")))
-                }
+                addressSuggestions = found
+                status = if (found.isEmpty()) "查無符合的地址" else "找到 " + found.size + " 個地址，請選取"
             } catch (e: Exception) { status = "地址查詢失敗，請稍後重試" }
         }
     }
 
     DisposableEffect(mapView) {
-        mapView.onCreate(Bundle())
-        mapView.onStart()
-        mapView.onResume()
         onDispose {
             generation++
             mapView.onPause()
@@ -252,6 +253,18 @@ fun NativeGoogleWaterMapScreen(
                     OutlinedTextField(address, { address = it }, label = { Text("輸入地址") },
                         singleLine = true, modifier = Modifier.weight(1f))
                     Button(onClick = { geocode() }) { Text("找地址") }
+                }
+                if (addressSuggestions.isNotEmpty()) {
+                    androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 145.dp)) {
+                        items(addressSuggestions.size) { index ->
+                            val candidate = addressSuggestions[index]
+                            TextButton(onClick = {
+                                address = candidate.first
+                                addressSuggestions = emptyList()
+                                moveCenter(candidate.second)
+                            }) { Text(candidate.first, maxLines = 2) }
+                        }
+                    }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     var expanded by remember { mutableStateOf(false) }
@@ -284,6 +297,10 @@ fun NativeGoogleWaterMapScreen(
         Box(Modifier.weight(1f)) {
             AndroidView(modifier = Modifier.fillMaxSize(), factory = {
                 mapView.apply {
+                    // MapView 必須先完成生命週期初始化，才可向 SDK 要求地圖。
+                    onCreate(Bundle())
+                    onStart()
+                    onResume()
                     getMapAsync { map ->
                         googleMap = map
                         map.uiSettings.isZoomControlsEnabled = true
