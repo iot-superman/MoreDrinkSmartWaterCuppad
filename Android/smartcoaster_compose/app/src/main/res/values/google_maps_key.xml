@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 本機測試請替換為 Android 應用程式限制的 API Key；不要提交真實金鑰。 -->
+    <string name="google_maps_key">YOUR_GOOGLE_MAPS_API_KEY</string>
+</resources>
