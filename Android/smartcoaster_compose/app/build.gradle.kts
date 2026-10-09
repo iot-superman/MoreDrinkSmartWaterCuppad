@@ -42,6 +42,6 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
     
-    // MQTT Client
+    // Google Maps 原生 SDK：地圖載入不使用 Maps JavaScript API。\n    implementation("com.google.android.gms:play-services-maps:19.2.0")\n    implementation("com.google.android.gms:play-services-location:21.3.0")\n\n    // MQTT Client
     implementation("org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5")
 }
