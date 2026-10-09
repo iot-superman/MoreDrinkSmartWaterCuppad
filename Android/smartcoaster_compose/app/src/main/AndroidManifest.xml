@@ -15,7 +15,9 @@
 
     <application
         android:theme="@style/Theme.SmartCoaster"
-        android:label="Smart Coaster">\n        <!-- 使用 Android 原生 Maps SDK；請將金鑰放進 res/values/google_maps_api.xml（不提交 Git）。 -->\n        <meta-data android:name="com.google.android.geo.API_KEY" android:value="@string/google_maps_key" />
+        android:label="Smart Coaster">
+        <!-- 使用 Android 原生 Maps SDK；請將金鑰放進 res/values/google_maps_api.xml（不提交 Git）。 -->
+        <meta-data android:name="com.google.android.geo.API_KEY" android:value="@string/google_maps_key" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
