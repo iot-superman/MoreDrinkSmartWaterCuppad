@@ -16,3 +16,6 @@ app/build/
 local.properties
 *.hprof
 *.hprof
+
+# Google Maps API Key: use a local key and never commit credentials.
+# Template placeholder is committed for Android resource resolution.
