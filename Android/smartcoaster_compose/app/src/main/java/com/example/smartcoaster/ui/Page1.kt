@@ -28,25 +28,38 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartcoaster.ui.theme.SmartCoasterTheme
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.sin
 
 @Composable
 fun Page1(
     onNavigateToNext: () -> Unit = {},
-    onBackClick: () -> Unit = {}
+    onBackClick: () -> Unit = {},
+    bleManager: BleManager? = null
 ) {
     // 狀態管理
-    var ssid by remember { mutableStateOf("thmrb306") }
+    var ssid by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var openNetwork by remember { mutableStateOf(false) }
     var isPasswordVisible by remember { mutableStateOf(false) }
 
     // 按鈕同步狀態: 0=未同步, 1=同步中, 2=同步完成
-    var syncStatus by remember { mutableIntStateOf(0) }
+    val provisioningState = bleManager?.provisioningState?.collectAsState()?.value
+        ?: WifiProvisioningState.Idle
+    val connectionState = bleManager?.connectionState?.collectAsState()?.value
+        ?: BleConnectionState.Disconnected
+    val syncStatus = when (provisioningState) {
+        WifiProvisioningState.Sending -> 1
+        is WifiProvisioningState.Success -> 2
+        else -> 0
+    }
     var isPasswordError by remember { mutableStateOf(false) }
 
-    val coroutineScope = rememberCoroutineScope()
+    LaunchedEffect(provisioningState) {
+        if (provisioningState is WifiProvisioningState.Success) onNavigateToNext()
+    }
+    DisposableEffect(bleManager) {
+        onDispose { bleManager?.cancelProvisioning() }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -79,7 +92,7 @@ fun Page1(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "請輸入 Wi-Fi 密碼，讓智能杯墊連上網路以同步數據。",
+                text = "請輸入 2.4 GHz Wi-Fi 帳密，讓智能杯墊連上網路。",
                 fontSize = 15.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 8.dp)
@@ -105,29 +118,27 @@ fun Page1(
                         fontWeight = FontWeight.Medium
                     )
                     Spacer(modifier = Modifier.height(6.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                    TextField(
+                        value = ssid,
+                        onValueChange = { ssid = it },
+                        placeholder = { Text("請輸入 Wi-Fi 名稱") },
+                        singleLine = true,
+                        enabled = syncStatus == 0,
                         modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("📶", fontSize = 20.sp)
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = ssid,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Normal,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        IconButton(onClick = { /* 更換 Wi-Fi 邏輯 */ }) {
-                            Text("⇄", fontSize = 20.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                        }
-                    }
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = openNetwork,
+                    onCheckedChange = { openNetwork = it; isPasswordError = false },
+                    enabled = syncStatus == 0
+                )
+                Text("開放網路（無密碼）")
+            }
 
             // 4. Wi-Fi 密碼輸入卡片
             Card(
@@ -156,6 +167,8 @@ fun Page1(
                         Spacer(modifier = Modifier.width(10.dp))
                         TextField(
                             value = password,
+                            enabled = !openNetwork && syncStatus == 0,
+                            singleLine = true,
                             onValueChange = {
                                 password = it
                                 if (it.isNotBlank()) isPasswordError = false
@@ -198,6 +211,16 @@ fun Page1(
                         .padding(start = 8.dp, top = 4.dp)
                 )
             }
+            if (provisioningState is WifiProvisioningState.Error) {
+                Text(
+                    text = provisioningState.message,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+            if (connectionState != BleConnectionState.Connected) {
+                TextButton(onClick = onBackClick) { Text("返回搜尋並重新連線") }
+            }
 
             Spacer(modifier = Modifier.height(100.dp)) // 留白避免被底部按鈕遮擋
         }
@@ -217,20 +240,14 @@ fun Page1(
             ) {
                 Button(
                     onClick = {
-                        if (password.isBlank()) {
+                        if (!openNetwork && password.isEmpty()) {
                             isPasswordError = true
                         } else {
                             isPasswordError = false
-                            coroutineScope.launch {
-                                syncStatus = 1 // 進入同步中
-                                delay(2500)
-                                syncStatus = 2 // 完成同步
-                                delay(800)     // 停頓 0.8 秒展示完成圖示
-                                onNavigateToNext() // 自動跳轉至下一頁
-                            }
+                            bleManager?.provisionWifi(ssid, if (openNetwork) "" else password)
                         }
                     },
-                    enabled = syncStatus != 1,
+                    enabled = syncStatus == 0 && connectionState == BleConnectionState.Connected,
                     shape = RoundedCornerShape(28.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (syncStatus == 2) Color(0xFFD7E5ED) else MaterialTheme.colorScheme.primary,

@@ -29,7 +29,10 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun ConnectSuccess(
-    onBackClick: () -> Unit = {}
+    onBackClick: () -> Unit = {},
+    deviceName: String = "",
+    ssid: String = "",
+    ip: String = "未提供"
 ) {
     // 漸進式動畫進場狀態
     var isHeaderVisible by remember { mutableStateOf(false) }
@@ -82,7 +85,7 @@ fun ConnectSuccess(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "設備已成功加入您的網路，並完成初始化設定。",
+                        text = "設備已回報 Wi-Fi 連線成功。",
                         fontSize = 15.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -122,8 +125,9 @@ fun ConnectSuccess(
                         InfoRow(
                             iconText = "⚖️",
                             label = "設備名稱",
-                            valueText = "ESP32S3_SCALE"
+                            valueText = deviceName
                         )
+                        InfoRow(iconText = "📶", label = "Wi-Fi 網路", valueText = ssid)
 
                         // Row 2: IP 地址 (帶淡灰色背景底)
                         Surface(
@@ -150,7 +154,7 @@ fun ConnectSuccess(
                                     )
                                 }
                                 Text(
-                                    text = "192.168.1.105",
+                                    text = ip,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Medium,
                                     fontFamily = FontFamily.Monospace,
@@ -186,10 +190,10 @@ fun ConnectSuccess(
                                     modifier = Modifier
                                         .size(8.dp)
                                         .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary)
+                                        .background(MaterialTheme.colorScheme.outline)
                                 )
                                 Text(
-                                    text = "已連線",
+                                    text = "未確認",
                                     fontSize = 15.sp,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     fontWeight = FontWeight.Medium
