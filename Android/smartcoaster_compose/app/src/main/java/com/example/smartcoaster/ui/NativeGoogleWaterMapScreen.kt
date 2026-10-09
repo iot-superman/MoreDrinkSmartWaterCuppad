@@ -305,7 +305,11 @@ fun NativeGoogleWaterMapScreen(
                         googleMap = map
                         map.uiSettings.isZoomControlsEnabled = true
                         map.setOnMapClickListener { moveCenter(it) }
-                        map.setOnMarkerDragEndListener { moveCenter(it.position) }
+                        map.setOnMarkerDragListener(object : GoogleMap.OnMarkerDragListener {
+                            override fun onMarkerDragStart(marker: Marker) {}
+                            override fun onMarkerDrag(marker: Marker) {}
+                            override fun onMarkerDragEnd(marker: Marker) { moveCenter(marker.position) }
+                        })
                         map.setOnMarkerClickListener {
                             chosen = it.tag as? WaterPlace
                             false
