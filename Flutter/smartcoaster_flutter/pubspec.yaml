@@ -1,0 +1,17 @@
+name: smartcoaster_flutter
+description: 多喝水沒事 - Flutter IoT 智慧水杯墊
+publish_to: none
+version: 0.1.0+1
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_blue_plus: ^1.35.5
+  mqtt_client: ^10.5.1
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+flutter:
+  uses-material-design: true
