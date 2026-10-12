@@ -49,12 +49,8 @@ import androidx.core.content.ContextCompat
 
 /**
  * 判斷 WebView 正在開啟的網址是否屬於 Google Maps／地圖導航。
- *
- * 網頁目前產生的格式是：
- * https://www.google.com/maps/dir/?api=1&destination=緯度,經度&travelmode=walking
- * 同時支援 Android 常見的 geo: 與 google.navigation: URI，方便未來網頁改版。
  */
-private fun isExternalMapNavigationUri(uri: Uri): Boolean {
+fun isExternalMapNavigationUri(uri: Uri): Boolean {
     val scheme = uri.scheme?.lowercase() ?: return false
 
     if (scheme == "geo" || scheme == "google.navigation") {
@@ -73,11 +69,9 @@ private fun isExternalMapNavigationUri(uri: Uri): Boolean {
 }
 
 /**
- * 優先以 Google Maps App 開啟導航；若手機未安裝 Google Maps，則交給系統選擇
- * 其他地圖 App 或外部瀏覽器。無論成功與否都由 Android 消化這次點擊，避免導航
- * 網址覆蓋原本 WebView，造成返回 App 時只剩「飲水機地圖載入失敗」。
+ * 優先以 Google Maps App 開啟導航。
  */
-private fun openExternalMapNavigation(context: Context, uri: Uri): Boolean {
+fun openExternalMapNavigation(context: Context, uri: Uri): Boolean {
     val googleMapsIntent = Intent(Intent.ACTION_VIEW, uri).apply {
         setPackage("com.google.android.apps.maps")
         addCategory(Intent.CATEGORY_BROWSABLE)
@@ -107,19 +101,11 @@ private fun openExternalMapNavigation(context: Context, uri: Uri): Boolean {
         ).show()
     }
 
-    // 即使沒有可處理的 App，也不要讓 Google Maps 網址取代飲水機 WebView。
     return true
 }
 
 /**
  * 第 2 個 Tab「找水喝」。
- *
- * 使用原生 WebView 內嵌附近飲水機 LBS 地圖，並針對手機操作做以下處理：
- * 1. 讓網頁依手機寬度排版，避免出現桌面版橫向捲動。
- * 2. 支援 JavaScript、DOM Storage 與 HTML5 定位。
- * 3. 網頁要求定位時，串接 Android 執行階段位置權限。
- * 4. 顯示載入中與錯誤畫面；正常狀態不覆蓋任何浮動操作按鈕。
- * 5. WebView 有上一頁時，系統返回鍵先回到網頁上一頁。
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -130,9 +116,6 @@ fun WaterMapScreen(
     val context = LocalContext.current
     val mapUrl = "https://iot-superman.github.io/water_map/"
 
-    // 網站的手機版原本會把搜尋結果清單排在整張地圖後面；WebView 若保留捲動位置，
-    // 畫面就可能停在清單區，看起來像「地圖消失」。App 內只保留地圖模式：
-    // 上方搜尋控制列 + 滿版地圖，搜尋結果仍會以 Marker 顯示在地圖上。
     val mobileMapOnlyScript = remember {
         """
         (function () {
@@ -159,7 +142,6 @@ fun WaterMapScreen(
                         overflow: hidden !important;
                     }
 
-                    /* App 內不顯示網頁標題、狀態診斷、結果清單與除錯文字。 */
                     .wrap > h1,
                     .wrap > .sub,
                     .wrap > .status,
@@ -179,7 +161,6 @@ fun WaterMapScreen(
 
                     #map {
                         display: block !important;
-                        /* 直接以 WebView 視窗為座標，不再依賴 .grid／.wrap 的百分比高度。 */
                         position: fixed !important;
                         inset: 0 !important;
                         z-index: 1 !important;
@@ -192,7 +173,6 @@ fun WaterMapScreen(
                         border-radius: 0 !important;
                     }
 
-                    /* 搜尋控制列固定於地圖頂端，效果與手機瀏覽器窄版畫面一致。 */
                     .wrap > .toolbar {
                         position: fixed !important;
                         z-index: 1200 !important;
@@ -202,15 +182,10 @@ fun WaterMapScreen(
                         bottom: auto !important;
                         width: auto !important;
                         margin: 0 !important;
-                        /* 候選清單屬於浮動內容，工具列本身不可裁切。 */
                         overflow: visible !important;
                         isolation: isolate !important;
                     }
 
-                    /*
-                     * 地址候選清單原本位於 .toolbar 內，Android 軟鍵盤開啟後會被
-                     * 工具列第二排遮住。清單移到 body 後，改以輸入框位置固定定位。
-                     */
                     #addressSuggestions.address-suggestions {
                         position: fixed !important;
                         z-index: 2147483647 !important;
@@ -231,7 +206,6 @@ fun WaterMapScreen(
                         -webkit-overflow-scrolling: touch !important;
                     }
 
-                    /* hidden 屬性仍由原網站控制；一旦有結果就強制顯示成獨立浮層。 */
                     #addressSuggestions.address-suggestions:not([hidden]) {
                         display: block !important;
                     }
@@ -246,11 +220,6 @@ fun WaterMapScreen(
                         opacity: 1 !important;
                     }
 
-                    /*
-                     * 鍵盤開啟時，工具列第二排會剛好落在候選清單後方。
-                     * 候選清單展開期間先隱藏第二排，避免任何 WebView 合成層遮住候選項目；
-                     * 選取地址或清單關閉後，原本控制項會立即恢復。
-                     */
                     html.smart-address-menu-open .wrap > .toolbar > .info,
                     html.smart-address-menu-open .wrap > .toolbar > #radius,
                     html.smart-address-menu-open .wrap > .toolbar > #refresh,
@@ -267,13 +236,11 @@ fun WaterMapScreen(
             var addressSuggestions = document.getElementById('addressSuggestions');
 
             function positionAddressSuggestions() {
-                // 網頁日後若重建搜尋元件，必須取得新節點，不能沿用已失效的參照。
                 addressInput = document.getElementById('addressInput');
                 addressSuggestions = document.getElementById('addressSuggestions');
                 if (!addressInput || !addressSuggestions) return;
 
                 var inputRect = addressInput.getBoundingClientRect();
-                // visualViewport 會反映 Android 軟鍵盤真正留下的可見區域。
                 var viewport = window.visualViewport;
                 var viewportTop = viewport ? viewport.offsetTop : 0;
                 var viewportHeight = viewport
@@ -289,7 +256,6 @@ fun WaterMapScreen(
                     Math.round(viewportBottom - suggestionsTop - 8)
                 );
 
-                // 清單寬度對齊整個浮動工具列，在窄螢幕也保留 8px 安全邊界。
                 var toolbar = addressInput.closest('.toolbar');
                 var toolbarRect = toolbar ? toolbar.getBoundingClientRect() : inputRect;
                 var viewportWidth = viewport
@@ -325,7 +291,6 @@ fun WaterMapScreen(
             }
 
             if (addressSuggestions && addressSuggestions.parentElement !== document.body) {
-                // 保留網站建立的同一節點與點擊事件，只移出 toolbar 的堆疊／裁切範圍。
                 document.body.appendChild(addressSuggestions);
             }
 
@@ -338,7 +303,6 @@ fun WaterMapScreen(
 
             if (addressSuggestions && addressSuggestions.dataset.smartCoasterObserved !== 'true') {
                 addressSuggestions.dataset.smartCoasterObserved = 'true';
-                // 網站非同步填入候選資料時，再次校正高度與位置。
                 new MutationObserver(positionAddressSuggestions).observe(addressSuggestions, {
                     attributes: true,
                     attributeFilter: ['hidden'],
@@ -366,7 +330,6 @@ fun WaterMapScreen(
                 window.dispatchEvent(new Event('resize'));
             }
 
-            // 網頁、Leaflet 與定位搜尋完成的時間不同，分段重繪可避免地圖尺寸為 0。
             restoreMapViewport();
             setTimeout(restoreMapViewport, 100);
             setTimeout(restoreMapViewport, 500);
@@ -375,9 +338,6 @@ fun WaterMapScreen(
         """.trimIndent()
     }
 
-    // 網頁本身會把最近一次搜尋結果保存於 localStorage，五分鐘內重新載入時會直接
-    // 還原快取並略過 GPS。App 新工作階段第一次進入地圖時，只刪除這一個搜尋快取，
-    // 再重新載入網頁，讓網頁既有的「GPS → 2 公里搜尋」流程完整執行。
     val forceFreshSearchScript = remember {
         """
         (function () {
@@ -389,7 +349,6 @@ fun WaterMapScreen(
                 console.warn('SmartCoaster: 無法清除地圖搜尋快取', error);
             }
 
-            // 有舊快取才需要 reload；首次安裝或快取已逾期時，網頁本身已會自動定位搜尋。
             if (hadCachedSearch) {
                 window.location.reload();
             }
@@ -401,10 +360,8 @@ fun WaterMapScreen(
     var isLoading by remember { mutableStateOf(true) }
     var hasMainFrameError by remember { mutableStateOf(false) }
 
-    // 避免 reload 後的第二次 onPageFinished 再次 reload，形成無限循環。
     var hasConsumedForceFreshSearch by remember { mutableStateOf(false) }
 
-    // WebView 的定位詢問需暫存，等 Android 權限對話框回傳後再答覆網頁。
     var pendingGeoOrigin by remember { mutableStateOf<String?>(null) }
     var pendingGeoCallback by remember {
         mutableStateOf<GeolocationPermissions.Callback?>(null)
@@ -414,14 +371,13 @@ fun WaterMapScreen(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
 
         pendingGeoCallback?.invoke(pendingGeoOrigin, granted, false)
         pendingGeoOrigin = null
         pendingGeoCallback = null
     }
 
-    // 僅當 WebView 內確實有瀏覽歷程時，攔截系統返回鍵。
     BackHandler(enabled = webView?.canGoBack() == true) {
         webView?.goBack()
     }
@@ -434,32 +390,25 @@ fun WaterMapScreen(
                     webView = this
 
                     settings.apply {
-                        // 地圖是互動式網頁，必須啟用 JavaScript 與瀏覽器端儲存空間。
                         javaScriptEnabled = true
                         domStorageEnabled = true
                         databaseEnabled = true
-                        // WebSettings 只有 setter，不能使用 Kotlin 屬性指定語法。
-                        // 明確呼叫方法可避免「Val cannot be reassigned／無法解析屬性」編譯錯誤。
                         setGeolocationEnabled(true)
 
-                        // 手機最佳化：套用 viewport，並讓內容自動符合 WebView 寬度。
                         useWideViewPort = true
                         loadWithOverviewMode = true
                         setSupportZoom(true)
                         builtInZoomControls = false
                         displayZoomControls = false
 
-                        // 導航連結雖使用 target="_blank"，仍交由目前 WebViewClient 攔截，
-                        // 再外拉 Google Maps；不在 WebView 內建立無法管理的新視窗。
                         setSupportMultipleWindows(false)
                         javaScriptCanOpenWindowsAutomatically = false
 
-                        // 地圖只需網路內容，關閉本機檔案存取以縮小攻擊面。
                         allowFileAccess = false
                         allowContentAccess = false
 
-                        // 在既有 User-Agent 後加入 App 標記，不破壞網站的手機裝置判斷。
-                        userAgentString = "$userAgentString SmartCoaster-Android"
+                        val defaultUa = userAgentString.orEmpty()
+                        userAgentString = "$defaultUa SmartCoaster-Android"
                     }
 
                     isVerticalScrollBarEnabled = false
@@ -473,19 +422,14 @@ fun WaterMapScreen(
                         }
 
                         override fun onPageFinished(view: WebView?, url: String?) {
-                            // 固定為「滿版地圖模式」，避免 WebView 停留在下方結果清單。
                             view?.evaluateJavascript(mobileMapOnlyScript, null)
 
                             if (forceFreshSearch && !hasConsumedForceFreshSearch) {
-                                // 先在原生端標記已執行，再要求網頁 reload；即使 reload 很快完成，
-                                // 第二次 onPageFinished 也不會重複清快取或再次重新載入。
                                 hasConsumedForceFreshSearch = true
                                 onForceFreshSearchConsumed()
                                 view?.evaluateJavascript(forceFreshSearchScript, null)
                             }
 
-                            // 部分 Android WebView 會在 onPageFinished 後才完成動態工具列；
-                            // 延後再注入兩次，腳本本身具冪等性，不會重複建立樣式或監聽器。
                             view?.postDelayed({
                                 if (view.isAttachedToWindow) {
                                     view.evaluateJavascript(mobileMapOnlyScript, null)
@@ -504,7 +448,6 @@ fun WaterMapScreen(
                             request: WebResourceRequest?,
                             error: WebResourceError?
                         ) {
-                            // 圖磚或圖示等子資源偶爾失敗，不應整頁改成錯誤畫面。
                             if (request?.isForMainFrame == true) {
                                 isLoading = false
                                 hasMainFrameError = true
@@ -517,13 +460,10 @@ fun WaterMapScreen(
                         ): Boolean {
                             val targetUri = request?.url ?: return false
 
-                            // Google Maps 導航必須離開 WebView，由原生 Android Intent 開啟。
-                            // 回到 App 時，原本的 Leaflet 飲水機地圖仍保持在原畫面。
                             if (isExternalMapNavigationUri(targetUri)) {
                                 return openExternalMapNavigation(context, targetUri)
                             }
 
-                            // HTTP(S) 頁面留在 WebView；電話、地圖導航等特殊協定交由手機 App。
                             if (targetUri.scheme == "http" || targetUri.scheme == "https") {
                                 return false
                             }
@@ -570,7 +510,6 @@ fun WaterMapScreen(
                 }
             },
             update = { currentWebView ->
-                // Compose 重新組合時保留同一個 WebView，不重複載入地圖。
                 webView = currentWebView
             }
         )
@@ -620,18 +559,18 @@ fun WaterMapScreen(
 
     DisposableEffect(Unit) {
         onDispose {
-            // 離開此 Tab 時釋放 WebView，避免 Activity 長時間持有網頁資源。
             pendingGeoCallback?.invoke(pendingGeoOrigin, false, false)
             pendingGeoCallback = null
             pendingGeoOrigin = null
 
-            webView?.apply {
+            val targetWebView = webView
+            webView = null
+            targetWebView?.apply {
                 stopLoading()
                 webChromeClient = null
                 webViewClient = WebViewClient()
                 destroy()
             }
-            webView = null
         }
     }
 }

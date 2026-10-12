@@ -33,7 +33,6 @@ fun DrinkStep3(
     val scrollState = rememberScrollState()
 
     LaunchedEffect(Unit) {
-        // 直接平滑捲動到最底部
         scrollState.animateScrollTo(scrollState.maxValue)
     }
 
@@ -197,14 +196,6 @@ fun DrinkStep3(
                     )
                 }
             }
-        }
-
-        // 智慧背景監測模式卡片
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
         }
 
         Surface(
