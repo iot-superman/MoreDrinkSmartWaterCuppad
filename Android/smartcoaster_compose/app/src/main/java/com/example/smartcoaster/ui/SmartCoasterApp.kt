@@ -1,5 +1,7 @@
 package com.example.smartcoaster.ui
 
+import kotlin.math.roundToInt
+
 import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -228,7 +230,9 @@ fun SmartCoasterApp() {
                                 coasterState.isEndRead = true
                             },
                             onNavigateToDrinkStep3 = {
+                                // 將本地紀錄與 MQTT 發布統一為同一個整數 ml，避免 18.x 在本地截斷成 18、雲端四捨五入成 19。
                                 val amount = kotlin.math.abs(coasterState.startWeight - coasterState.endWeight)
+                                    .roundToInt().toFloat()
                                 coasterState.intakeAmount = amount
                                 coasterState.totalIntake += amount
 
