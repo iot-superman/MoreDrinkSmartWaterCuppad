@@ -172,7 +172,7 @@ fun Page3(
                 text = when (connectionState) {
                     is BleConnectionState.Error -> connectionState.message
                     BleConnectionState.Connecting -> "正在連線及訂閱設備通知..."
-                    else -> if (hasPermission) "請將智慧水壺底座靠近您的手機" else "請授予藍牙與定位權限以搜尋裝置"
+                    else -> if (hasPermission) "請將智慧杯墊靠近您的手機" else "請授予藍牙與定位權限以搜尋裝置"
                 },
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant

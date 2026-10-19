@@ -44,7 +44,7 @@ fun DrinkingWaterScreen(
     // 內部狀態用來觸發動畫
     var targetIntake by remember { mutableFloatStateOf(previousIntake) }
 
-    // 當返回主頁時，水位緩緩上升
+    // 當返回主頁或數值更新時，水位上升動畫
     LaunchedEffect(totalIntake) {
         if (totalIntake != previousIntake) {
             delay(400) // 先顯示舊水位，等待一下再開始上升
@@ -57,7 +57,7 @@ fun DrinkingWaterScreen(
     // 動畫進度
     val animatedProgress by animateFloatAsState(
         targetValue = targetIntake / MAX_INTAKE,
-        animationSpec = tween(1500, easing = FastOutSlowInEasing), // 較長的動畫時間以便觀察
+        animationSpec = tween(1500, easing = FastOutSlowInEasing),
         label = "waterLevelAnimation"
     )
 
@@ -73,7 +73,7 @@ fun DrinkingWaterScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
             .verticalScroll(rememberScrollState())
-            .padding(bottom = 80.dp) // 為 TabBar 留出空間
+            .padding(bottom = 80.dp)
     ) {
         Box(Modifier.fillMaxWidth().height(390.dp).padding(horizontal = 20.dp)) {
             Column(Modifier.align(Alignment.TopCenter).padding(top = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -94,7 +94,7 @@ fun DrinkingWaterScreen(
         // 智慧杯墊即時數據卡片
         Surface(
             modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp), 
+            shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.primaryContainer,
             shadowElevation = 4.dp
         ) {
@@ -106,13 +106,11 @@ fun DrinkingWaterScreen(
                     modifier = Modifier.size(48.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        // 底層秤重圖示
                         Icon(
                             imageVector = Icons.Default.Scale,
                             contentDescription = "歸零校準",
                             tint = Color.White
                         )
-                        // 中間疊加一個小型的回轉箭頭，代表 Tare / 重設
                         Icon(
                             imageVector = Icons.Default.Autorenew,
                             contentDescription = null,
@@ -133,7 +131,7 @@ fun DrinkingWaterScreen(
                 }
             }
         }
-        
+
         Text("補水建議", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 20.dp, top = 22.dp, bottom = 12.dp))
         Row(
             Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp),
