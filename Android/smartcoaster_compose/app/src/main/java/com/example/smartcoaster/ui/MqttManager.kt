@@ -113,10 +113,14 @@ class MqttManager(
     }
 
     fun publish(cmd: String) {
+        publishPayload("esp32/cmd", cmd)
+    }
+
+    fun publishPayload(topic: String, payload: String) {
         try {
             if (client?.isConnected == true) {
-                client?.publish("esp32/cmd", MqttMessage(cmd.toByteArray()))
-                onLogReceived("TX: $cmd")
+                client?.publish(topic, MqttMessage(payload.toByteArray()))
+                onLogReceived("TX [$topic]: $payload")
             }
         } catch (e: Exception) { /* ... */ }
     }

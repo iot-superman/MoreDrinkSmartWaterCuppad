@@ -1,5 +1,6 @@
 package com.example.smartcoaster.ui
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -49,6 +50,7 @@ fun SmartCoasterApp() {
     val bleManager = remember { BleManager(context) }
     val bleConnectionState by bleManager.connectionState.collectAsState()
     val connectedDeviceName by bleManager.connectedDeviceName.collectAsState()
+    val connectedDeviceAddress by bleManager.connectedDeviceAddress.collectAsState()
     val provisioningState by bleManager.provisioningState.collectAsState()
     DisposableEffect(bleManager) {
         onDispose { bleManager.disconnect() }
@@ -233,6 +235,29 @@ fun SmartCoasterApp() {
                                 // 關鍵修復：在結算完成時，立即同步寫入歷史紀錄資料庫！
                                 if (amount > 0f) {
                                     HistoryStorage.addRecord(context, amount)
+                                    //同時mqtt pushlish to topic: esp32
+                                    //{
+                                    //  "uid": "android-00AE",(android-MAC ADDRESS後4碼)
+                                    //  "amount_ml": ${amount}
+                                    //}
+                                    // 1. 組成 JSON 字串 (以水杯墊 BLE MAC 位址後 4 碼作為 uid)
+                                    val rawMac = connectedDeviceAddress
+                                        ?.takeIf { it.isNotBlank() }
+                                        ?: bleManager.connectedDeviceName.value?.takeIf { it.isNotBlank() }
+                                        ?: bleManager.getSavedMacAddress()
+                                    Log.d("main", "rawMac:$rawMac")
+                                    val cleanMac = rawMac.replace(":", "").replace("-", "")
+                                    val last4Code = if (cleanMac.length >= 4) cleanMac.takeLast(4).uppercase() else "0000"
+                                    val uid = "android-$last4Code"
+                                    val jsonPayload = """
+                                        {
+                                          "uid": "$uid",
+                                          "amount_ml": $amount
+                                        }
+                                    """.trimIndent()
+
+                                    // 2. 透過 mqttManager 發布至指定 Topic (例如 esp32 或 esp32/cmd)
+                                    mqttManager.publishPayload("esp32", jsonPayload)
                                 }
 
                                 currentSubPage = "DrinkStep3"
