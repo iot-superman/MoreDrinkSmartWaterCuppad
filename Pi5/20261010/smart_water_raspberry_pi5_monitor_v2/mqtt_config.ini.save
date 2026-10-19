@@ -1,0 +1,29 @@
+:qq[mqtt]
+# ============================================================
+# Raspberry Pi 5 MQTT 監看設定
+# ============================================================
+broker = broker.mqttgo.io
+port = 1883
+
+# 訂閱 esp32 底下所有子 Topic，例如 esp32/homename。
+topic = esp32/#
+
+username =
+password =
+use_tls = false
+
+[device]
+# 裝置未在 JSON 內提供 uid 時，使用此預設值。
+default_uid = 311
+
+[render]
+# true：先寫入 Raspberry Pi SQLite，再同步到 Render API。
+enabled = true
+
+api_url = https://django-water-cuppad-dashboard.onrender.com/api/drinks/mqtt/
+
+# 這裡填的是環境變數名稱，不是 API Key 本身。
+api_key_env = MQTT_API_KEY
+
+# Render 免費服務可能需要時間喚醒。
+timeout_seconds = 90

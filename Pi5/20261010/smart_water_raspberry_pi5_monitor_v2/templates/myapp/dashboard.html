@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智慧喝水儀表板 - Django + SQLite 本地版</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    .metric { font-size: 2rem; font-weight: 800; }
+    .progress { height: 14px; border-radius: 20px; background: #dcecf7; }
+    .progress-bar { background: linear-gradient(90deg, #0d6efd, #20c997); }
+    .water-icon { width: 62px; height: 62px; display: grid; place-items: center; border-radius: 18px; background: #dff5ff; font-size: 30px; }
+    .table > :not(caption) > * > * { padding: 0.9rem 0.7rem; }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-dark bg-primary shadow-sm">
+    <div class="container">
+      <span class="navbar-brand">🚰 智慧喝水儀表板</span>
+      <span class="text-white-50">Django + SQLite 本地版</span>
+    </div>
+  </nav>
+
+  <main class="container py-4">
+    {% for message in messages %}
+      <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-success{% endif %} alert-dismissible fade show">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+
+    <section class="hero p-4 lg-5 mb-4 bg-white rounded-4 shadow-sm">
+      <div class="row align-items-center g-4">
+        <div class="col-lg-8">
+          <div class="small opacity-75">今天已喝</div>
+          <div class="display-4 fw-bold">{{ today_total }} <small class="fs-4">ml</small></div>
+          <div class="mt-2">每日目標 {{ goal.daily_goal_ml }} ml</div>
+        </div>
+        <div class="col-lg-4">
+          <div class="d-flex justify-content-between mb-2">
+            <span>今日完成度</span>
+            <strong>{{ progress }}%</strong>
+          </div>
+          <div class="progress">
+            <div class="progress-bar" style="width: {{ progress }}%;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="row g-4 mb-4">
+      <div class="col-md-4">
+        <div class="card h-100 p-4 border-0 shadow-sm d-flex flex-row align-items-center justify-content-between">
+          <div>
+            <div class="text-secondary">今日喝水</div>
+            <div class="metric">{{ today_total }} ml</div>
+          </div>
+          <div class="water-icon">🥤</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100 p-4 border-0 shadow-sm d-flex flex-row align-items-center justify-content-between">
+          <div>
+            <div class="text-secondary">每日目標</div>
+            <div class="metric">{{ goal.daily_goal_ml }} ml</div>
+          </div>
+          <div class="water-icon">🎯</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100 p-4 border-0 shadow-sm d-flex flex-row align-items-center justify-content-between">
+          <div>
+            <div class="text-secondary">今日次數</div>
+            <div class="metric">{{ record_count }} 次</div>
+          </div>
+          <div class="water-icon">📊</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+      <div class="col-lg-7">
+        <div class="card h-100 p-4 border-0 shadow-sm">
+          <h2 class="h5 fw-bold mb-3">近七日喝水量 (折線圖)</h2>
+          <canvas id="waterChart" height="145"></canvas>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="card h-100 p-4 border-0 shadow-sm">
+          <h2 class="h5 fw-bold mb-3">新增喝水紀錄</h2>
+          <form method="post">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label class="form-label">喝水量 (ml)</label>
+              <input type="number" name="amount_ml" class="form-control" required placeholder="例如：250">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">喝水時間籤</label>
+              <input type="datetime-local" name="recorded_at" class="form-control" value="{{ current_time }}">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">備註</label>
+              <input type="text" name="note" class="form-control" placeholder="例如：早餐後">
+            </div>
+            <button type="submit" name="action" value="add_record" class="btn btn-primary w-100 py-2">＋ 儲存喝水紀錄</button>
+          </form>
+
+          <hr class="my-4">
+          <form method="post" class="d-flex gap-2 align-items-end">
+            {% csrf_token %}
+            <div class="flex-grow-1">
+              <label class="form-label small text-secondary">修改每日目標 (ml)</label>
+              <input type="number" name="daily_goal_ml" class="form-control" value="{{ goal.daily_goal_ml }}" required>
+            </div>
+            <button type="submit" name="action" value="update_goal" class="btn btn-outline-secondary">更新</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-4 mb-4 border-0 shadow-sm">
+      <h2 class="h5 fw-bold mb-3">今日每小時喝水量 (長條圖)</h2>
+      <canvas id="hourlyChart" height="90"></canvas>
+    </div>
+
+    <div class="card p-4 mb-4 border-0 shadow-sm">
+      <h2 class="h5 fw-bold mb-3">最近喝水紀錄</h2>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>喝水時間籤</th>
+              <th>資料入庫時間籤</th>
+              <th>喝水量</th>
+              <th>來源</th>
+              <th>裝置 UID</th>
+              <th>備註</th>
+              <th class="text-center">已轉發 Render</th>
+              <th class="text-end">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in recent_records %}
+            <tr>
+              <td class="text-nowrap">{{ item.recorded_at|date:"Y/m/d H:i:s" }}</td>
+              <td class="text-nowrap">{{ item.created_at|date:"Y/m/d H:i:s" }}</td>
+              <td><span class="badge bg-info-subtle text-info-emphasis px-2 py-1">{{ item.amount_ml }} ml</span></td>
+              <td><span class="badge bg-primary-subtle text-primary px-2 py-1">{{ item.get_source_display }}</span></td>
+              <td>{{ item.device_uid|default:"-" }}</td>
+              <td>{{ item.note|default:"-" }}</td>
+              <td class="text-center">
+                {% if item.synced_to_render %}
+                  <span style="color: #10b981; font-weight: bold; font-size: 1.25rem;">✓</span>
+                {% else %}
+                  <span style="color: #9ca3af; font-size: 1.1rem;">—</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <form method="post" action="{% url 'delete_record' item.pk %}" onsubmit="return confirm('確定要刪除此筆紀錄？');" style="display:inline;">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-danger">刪除</button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="8" class="text-center text-muted py-4">目前尚無喝水紀錄</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
+  <script>
+    new Chart(document.getElementById('waterChart'), {
+      type: 'line',
+      data: {
+        labels: {{ chart_labels|safe }},
+        datasets: [{
+          label: '喝水量 (ml)',
+          data: {{ chart_values|safe }},
+          fill: true,
+          tension: 0.35,
+          borderColor: '#0d6efd',
+          backgroundColor: 'rgba(13, 110, 253, 0.08)'
+        }]
+      }
+    });
+
+    new Chart(document.getElementById('hourlyChart'), {
+      type: 'bar',
+      data: {
+        labels: {{ hourly_labels|safe }},
+        datasets: [{
+          label: '喝水量 (ml)',
+          data: {{ hourly_values|safe }},
+          borderRadius: 7,
+          backgroundColor: '#20c997'
+        }]
+      }
+    });
+
+    // 只有在未聚焦於表單時才每 15 秒自動刷新最新數據
+    setInterval(() => {
+      const activeTag = document.activeElement ? document.activeElement.tagName : '';
+      if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA') {
+        window.location.reload();
+      }
+    }, 15000);
+  </script>
+</body>
+</html>
