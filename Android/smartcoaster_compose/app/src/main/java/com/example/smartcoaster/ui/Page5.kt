@@ -1,5 +1,7 @@
 package com.example.smartcoaster.ui
 
+import kotlin.math.roundToInt
+
 import android.content.Context
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -371,7 +373,7 @@ fun Page5(
                                 iconEmoji = item.iconEmoji,
                                 title = item.title,
                                 time = item.timeStr,
-                                valueText = "+${item.amountMl.toInt()}ml",
+                                valueText = "+${item.amountMl.roundToInt()}ml",
                                 isBlueValue = true
                             )
                         }
