@@ -38,6 +38,9 @@ class BleManager(private val context: Context) {
     private val _connectedDeviceName = MutableStateFlow<String?>(null)
     val connectedDeviceName: StateFlow<String?> = _connectedDeviceName
 
+    private val _connectedDeviceAddress = MutableStateFlow<String?>(null)
+    val connectedDeviceAddress: StateFlow<String?> = _connectedDeviceAddress
+
     private val handler = Handler(Looper.getMainLooper())
     private var timeout: Runnable? = null
     private var provisioning: LegacyWifiProvisioning? = null
@@ -63,7 +66,12 @@ class BleManager(private val context: Context) {
                 when (newState) {
                     BluetoothProfile.STATE_CONNECTED -> {
                         Log.d("BleManager", "已成功連接至 GATT Server")
-                        _connectedDeviceName.value = gatt.device.name ?: gatt.device.address
+                        val addr = gatt.device.address
+                        _connectedDeviceName.value = gatt.device.name ?: addr
+                        _connectedDeviceAddress.value = addr
+                        if (!addr.isNullOrEmpty()) {
+                            saveMacAddress(addr)
+                        }
                         // dev sends complete, unframed UTF-8 log notifications.
                         if (!gatt.requestMtu(185) && !gatt.discoverServices()) {
                             failConnection("無法搜尋設備服務")
@@ -173,9 +181,23 @@ class BleManager(private val context: Context) {
         _provisioningState.value = WifiProvisioningState.Success(attempt.ssid, result.ip)
     }
 
+    fun saveMacAddress(mac: String) {
+        if (mac.isBlank()) return
+        context.getSharedPreferences("smartcoaster_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putString("last_device_mac", mac)
+            .apply()
+    }
+
+    fun getSavedMacAddress(): String {
+        return context.getSharedPreferences("smartcoaster_prefs", Context.MODE_PRIVATE)
+            .getString("last_device_mac", "") ?: ""
+    }
+
     // 呼叫此方法開始真實連線至 ESP32 / 藍牙裝置
     @Synchronized
     fun connect(macAddress: String) {
+        saveMacAddress(macAddress)
         closeGatt()
         mtu = 23
         _provisioningState.value = WifiProvisioningState.Idle
@@ -294,6 +316,7 @@ class BleManager(private val context: Context) {
         pendingChunks.clear()
         allChunksWritten = false
         _connectedDeviceName.value = null
+        _connectedDeviceAddress.value = null
         val gatt = bluetoothGatt
         bluetoothGatt = null
         gatt?.disconnect()
