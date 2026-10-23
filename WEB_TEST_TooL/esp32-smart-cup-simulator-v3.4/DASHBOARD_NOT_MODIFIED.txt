@@ -1,0 +1,3 @@
+Dashboard source inspected only; NOT modified by simulator v3.
+Original filename: smart_health_bootstrap_v5(1).html
+SHA256: 5e517449fc3ebfaa5b94f36a580945ce5785c412f6449c8725c8411b2ad7d03f
